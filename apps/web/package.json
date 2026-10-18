@@ -1,0 +1,31 @@
+{
+  "name": "@foresite/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Foresite PWA shell: screens, API routes and the device ingest endpoint.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port 3000",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@foresite/ui": "0.1.0",
+    "next": "15.5.28",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "server-only": "0.0.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.56.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "autoprefixer": "10.4.27",
+    "postcss": "8.5.30",
+    "tailwindcss": "3.4.19"
+  }
+}

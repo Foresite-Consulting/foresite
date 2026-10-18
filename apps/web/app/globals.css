@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-bg font-sans text-body text-text-primary antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply min-h-dvh bg-bg;
+  }
+
+  a {
+    @apply text-link underline decoration-1 underline-offset-4 hover:decoration-2;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-offset-2;
+  }
+}

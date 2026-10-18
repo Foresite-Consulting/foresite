@@ -1,0 +1,195 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * Runs public/sw.js inside a fake service-worker global so its caching rules
+ * can be tested without a browser.
+ */
+
+type Listener = (event: FakeEvent) => void;
+
+interface FakeEvent {
+  request: Request;
+  waitUntil: (promise: Promise<unknown>) => void;
+  respondWith: (response: Promise<Response> | Response) => void;
+}
+
+class FakeCache {
+  store = new Map<string, Response>();
+  async match(request: Request | string) {
+    const key = typeof request === 'string' ? new URL(request, ORIGIN).href : request.url;
+    const hit = this.store.get(key);
+    return hit ? hit.clone() : undefined;
+  }
+  async put(request: Request | string, response: Response) {
+    const key = typeof request === 'string' ? new URL(request, ORIGIN).href : request.url;
+    this.store.set(key, response);
+  }
+  async keys() {
+    return [...this.store.keys()].map((url) => new Request(url));
+  }
+}
+
+const ORIGIN = 'https://venue.example';
+
+function load() {
+  const caches = new Map<string, FakeCache>();
+  const cacheStorage = {
+    async open(name: string) {
+      let cache = caches.get(name);
+      if (!cache) {
+        cache = new FakeCache();
+        caches.set(name, cache);
+      }
+      return cache;
+    },
+    async keys() {
+      return [...caches.keys()];
+    },
+    async delete(name: string) {
+      return caches.delete(name);
+    },
+    async match(request: Request | string) {
+      for (const cache of caches.values()) {
+        const hit = await cache.match(request);
+        if (hit) return hit;
+      }
+      return undefined;
+    },
+  };
+
+  const listeners = new Map<string, Listener[]>();
+  const self = {
+    location: new URL(ORIGIN),
+    addEventListener(type: string, listener: Listener) {
+      listeners.set(type, [...(listeners.get(type) ?? []), listener]);
+    },
+    skipWaiting: vi.fn(async () => undefined),
+    clients: { claim: vi.fn(async () => undefined) },
+  };
+
+  const fetchMock = vi.fn<(input: Request | string, init?: RequestInit) => Promise<Response>>();
+  const source = readFileSync(fileURLToPath(new URL('../public/sw.js', import.meta.url)), 'utf8');
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  new Function('self', 'caches', 'fetch', 'URL', 'Response', source)(
+    self,
+    cacheStorage,
+    fetchMock,
+    URL,
+    Response,
+  );
+
+  async function dispatch(type: 'install' | 'activate' | 'fetch', request?: Request) {
+    const pending: Promise<unknown>[] = [];
+    let responded: Promise<Response> | Response | undefined;
+    const event: FakeEvent = {
+      request: request ?? new Request(ORIGIN),
+      waitUntil: (promise) => pending.push(promise),
+      respondWith: (response) => {
+        responded = response;
+      },
+    };
+    for (const listener of listeners.get(type) ?? []) listener(event);
+    await Promise.all(pending);
+    return responded === undefined ? undefined : await responded;
+  }
+
+  return { caches, cacheStorage, fetchMock, self, dispatch };
+}
+
+const offlineHtml =
+  '<html><script src="/_next/static/chunks/offline-abc.js"></script><link href="/_next/static/css/app-1.css"></html>';
+
+/** Node's Request rejects mode "navigate", so fake it on top of a real Request. */
+function navigate(path: string): Request {
+  return Object.create(new Request(`${ORIGIN}${path}`), {
+    mode: { value: 'navigate' },
+  }) as Request;
+}
+
+function html(body: string) {
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'text/html' } });
+}
+
+describe('service worker', () => {
+  let sw: ReturnType<typeof load>;
+
+  beforeEach(() => {
+    sw = load();
+    sw.fetchMock.mockImplementation(async (input) => {
+      const url = new URL(typeof input === 'string' ? input : input.url, ORIGIN);
+      if (url.pathname === '/offline') return html(offlineHtml);
+      if (url.pathname.startsWith('/_next/static/')) return new Response('asset');
+      if (url.pathname === '/api/health') return Response.json({ status: 'ok' });
+      return html('<html>page</html>');
+    });
+  });
+
+  it('precaches the offline page and the chunks it references on install', async () => {
+    await sw.dispatch('install');
+    const cache = sw.caches.get('foresite-v1');
+    expect(cache).toBeDefined();
+    const keys = (await cache!.keys()).map((r) => new URL(r.url).pathname);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        '/offline',
+        '/_next/static/chunks/offline-abc.js',
+        '/_next/static/css/app-1.css',
+      ]),
+    );
+    expect(sw.self.skipWaiting).toHaveBeenCalled();
+  });
+
+  it('removes old caches on activate', async () => {
+    await sw.cacheStorage.open('foresite-v0');
+    await sw.cacheStorage.open('other-app');
+    await sw.dispatch('activate');
+    expect(await sw.cacheStorage.keys()).toEqual(['other-app']);
+    expect(sw.self.clients.claim).toHaveBeenCalled();
+  });
+
+  it('serves pages from the network and never caches them', async () => {
+    await sw.dispatch('install');
+    const request = navigate('/');
+    const response = await sw.dispatch('fetch', request);
+    expect(await response!.text()).toBe('<html>page</html>');
+    const keys = (await sw.caches.get('foresite-v1')!.keys()).map((r) => new URL(r.url).pathname);
+    expect(keys).not.toContain('/');
+  });
+
+  it('falls back to the cached offline page when a navigation fails', async () => {
+    await sw.dispatch('install');
+    sw.fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    const response = await sw.dispatch('fetch', navigate('/'));
+    expect(response!.status).toBe(200);
+    expect(await response!.text()).toBe(offlineHtml);
+  });
+
+  it('answers 503 when nothing is cached and the network is down', async () => {
+    sw.fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    const response = await sw.dispatch('fetch', navigate('/'));
+    expect(response!.status).toBe(503);
+  });
+
+  it('leaves API, auth, non-GET and cross-origin requests alone', async () => {
+    for (const request of [
+      new Request(`${ORIGIN}/api/health`),
+      new Request(`${ORIGIN}/auth/callback`),
+      new Request(`${ORIGIN}/`, { method: 'POST' }),
+      new Request('https://other.example/_next/static/x.js'),
+    ]) {
+      expect(await sw.dispatch('fetch', request)).toBeUndefined();
+    }
+    expect(sw.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('serves hashed static assets cache-first', async () => {
+    const request = new Request(`${ORIGIN}/_next/static/chunks/a.js`);
+    await sw.dispatch('fetch', request);
+    expect(sw.fetchMock).toHaveBeenCalledTimes(1);
+    const again = await sw.dispatch('fetch', new Request(`${ORIGIN}/_next/static/chunks/a.js`));
+    expect(await again!.text()).toBe('asset');
+    expect(sw.fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
