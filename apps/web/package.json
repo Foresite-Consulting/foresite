@@ -10,17 +10,22 @@
     "start": "next start --hostname 127.0.0.1 --port 3000",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "device:create": "tsx scripts/device-create.ts"
   },
   "dependencies": {
+    "@foresite/connectors": "0.1.0",
     "@foresite/ui": "0.1.0",
     "next": "15.5.28",
+    "postgres": "3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.10.2",
+    "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "1.56.1",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",

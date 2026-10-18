@@ -26,8 +26,11 @@ export const config = {
   matcher: [
     {
       // Documents only. Static assets, the service worker, the manifest and
-      // theme assets are not HTML and need no nonce.
-      source: '/((?!_next/static|_next/image|sw\\.js|manifest\\.webmanifest|theme-assets/).*)',
+      // theme assets are not HTML and need no nonce. Device ingest
+      // (`/api/ingest/`) is machine-to-machine JSON: it skips the middleware
+      // entirely and sets its own no-store headers.
+      source:
+        '/((?!_next/static|_next/image|sw\\.js|manifest\\.webmanifest|theme-assets/|api/ingest/).*)',
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' },
