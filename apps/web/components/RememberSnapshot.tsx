@@ -1,19 +1,23 @@
 'use client';
 
 import { useEffect } from 'react';
-import { LAST_SNAPSHOT_KEY, type KpiSnapshot } from '@/lib/demo-data';
+import type { KpiSnapshot } from '@/lib/demo-data';
+import { forgetSnapshot as forget, saveSnapshot } from '@/lib/snapshot-storage';
 
 /**
  * Keeps the last numbers the dashboard showed on this device so the offline
- * page can show them with their "last updated" time. Stored in localStorage;
- * cleared by `forgetSnapshot()` (to be called on sign-out once auth lands).
+ * page can show them with their "last updated" time. Stored in localStorage.
+ *
+ * Only demo snapshots are kept (see `mayPersistSnapshot`): whether live
+ * trading figures may stay on a device, and for how long, is for the auth PR
+ * to decide, along with clearing them on sign-out via `forgetSnapshot()`.
  */
 export function RememberSnapshot({ snapshot }: { snapshot: KpiSnapshot }) {
   useEffect(() => {
     try {
-      window.localStorage.setItem(LAST_SNAPSHOT_KEY, JSON.stringify(snapshot));
+      saveSnapshot(window.localStorage, snapshot);
     } catch {
-      // Private mode or storage full: the offline page will say there are no saved numbers.
+      // window.localStorage itself can throw when storage is blocked.
     }
   }, [snapshot]);
   return null;
@@ -21,8 +25,8 @@ export function RememberSnapshot({ snapshot }: { snapshot: KpiSnapshot }) {
 
 export function forgetSnapshot(): void {
   try {
-    window.localStorage.removeItem(LAST_SNAPSHOT_KEY);
+    forget(window.localStorage);
   } catch {
-    // Nothing to clear.
+    // Storage blocked: nothing to clear.
   }
 }

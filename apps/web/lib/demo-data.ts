@@ -122,26 +122,73 @@ export function demoSnapshot(now: Date = new Date(), timeZone = 'Australia/Perth
 /** Browser storage key for the last snapshot the dashboard rendered. */
 export const LAST_SNAPSHOT_KEY = 'foresite.lastSnapshot.v1';
 
+/** Limits for a stored snapshot, so a tampered or corrupt value cannot flood the offline page. */
+export const SNAPSHOT_LIMITS = { maxTiles: 24, maxStringLength: 200 } as const;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isShortString(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= SNAPSHOT_LIMITS.maxStringLength;
+}
+
+function isOptional(value: unknown, check: (v: unknown) => boolean): boolean {
+  return value === undefined || check(value);
+}
+
+function isChange(value: unknown): value is KpiChange {
+  return (
+    isRecord(value) &&
+    (value.direction === 'up' || value.direction === 'down' || value.direction === 'flat') &&
+    isShortString(value.amount) &&
+    isShortString(value.comparison) &&
+    (value.sentiment === undefined ||
+      value.sentiment === 'positive' ||
+      value.sentiment === 'negative' ||
+      value.sentiment === 'neutral')
+  );
+}
+
+function isForecastRange(value: unknown): value is KpiForecastRange {
+  return isRecord(value) && isShortString(value.low) && isShortString(value.high);
 }
 
 function isTile(value: unknown): value is KpiSnapshotTile {
   return (
     isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.label === 'string' &&
-    typeof value.value === 'string'
+    isShortString(value.id) &&
+    isShortString(value.label) &&
+    isShortString(value.value) &&
+    isOptional(value.change, isChange) &&
+    isOptional(value.forecastRange, isForecastRange)
   );
 }
 
+function isTimeZone(value: unknown): value is string {
+  if (!isShortString(value)) return false;
+  try {
+    new Intl.DateTimeFormat('en-AU', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Shape check for a snapshot read back from browser storage. Anything on the
+ * device can be edited, so this is strict: known fields only, valid date and
+ * timezone, at most 24 tiles and 200 characters per string.
+ */
 export function isKpiSnapshot(value: unknown): value is KpiSnapshot {
   return (
     isRecord(value) &&
-    typeof value.updatedAt === 'string' &&
-    typeof value.timeZone === 'string' &&
+    isShortString(value.updatedAt) &&
+    !Number.isNaN(Date.parse(value.updatedAt)) &&
+    isTimeZone(value.timeZone) &&
     (value.source === 'demo' || value.source === 'live') &&
     Array.isArray(value.tiles) &&
+    value.tiles.length <= SNAPSHOT_LIMITS.maxTiles &&
     value.tiles.every(isTile)
   );
 }

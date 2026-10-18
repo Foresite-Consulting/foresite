@@ -22,7 +22,7 @@ Caches are named `foresite-<version>` (now `v2`); bump `CACHE_VERSION` in `sw.js
 
 The worker never caches dashboard HTML, because that would keep sales figures in the HTTP cache. Instead the dashboard page writes the snapshot it rendered (tile labels, formatted values, the `updatedAt` time and timezone) to `localStorage` under `foresite.lastSnapshot.v1`. The offline page reads it, validates its shape, and shows the tiles with "Last updated 18 Oct 2026, 2:05 pm AWST".
 
-Open question for the auth PR: clear the snapshot on sign-out (`forgetSnapshot()` in `components/RememberSnapshot.tsx`) and decide whether wage-related tiles may be kept on the device at all.
+Until the auth PR decides retention, only **demo** snapshots are written (`mayPersistSnapshot` in `lib/snapshot-storage.ts`); live numbers are never kept on the device. Read-back is strict (`isKpiSnapshot`): known fields only, a valid date and timezone, at most 24 tiles and 200 characters per string, 64 KB in all. Open question for the auth PR: clear the snapshot on sign-out (`forgetSnapshot()` in `components/RememberSnapshot.tsx`) and decide whether live, and wage-related, tiles may be kept on the device at all.
 
 ## Testing
 

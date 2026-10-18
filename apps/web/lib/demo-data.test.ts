@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { demoSnapshot, isKpiSnapshot } from './demo-data';
+import { SNAPSHOT_LIMITS, demoSnapshot, isKpiSnapshot } from './demo-data';
 
 describe('demoSnapshot', () => {
   const snapshot = demoSnapshot(new Date('2026-10-18T06:05:00Z'));
@@ -39,5 +39,54 @@ describe('isKpiSnapshot', () => {
       isKpiSnapshot({ updatedAt: 'x', timeZone: 'UTC', source: 'demo', tiles: [{ id: 1 }] }),
     ).toBe(false);
     expect(isKpiSnapshot(JSON.parse(JSON.stringify(demoSnapshot())))).toBe(true);
+  });
+
+  const base = () => JSON.parse(JSON.stringify(demoSnapshot())) as Record<string, unknown>;
+  const tile = { id: 't', label: 'Label', value: '$1' };
+
+  it('accepts up to 24 tiles and rejects more', () => {
+    expect(isKpiSnapshot({ ...base(), tiles: Array.from({ length: 24 }, () => tile) })).toBe(true);
+    expect(isKpiSnapshot({ ...base(), tiles: Array.from({ length: 25 }, () => tile) })).toBe(false);
+    expect(SNAPSHOT_LIMITS.maxTiles).toBe(24);
+  });
+
+  it('rejects strings over 200 characters anywhere in the snapshot', () => {
+    const long = 'x'.repeat(201);
+    const ok = 'x'.repeat(200);
+    expect(isKpiSnapshot({ ...base(), tiles: [{ ...tile, label: ok }] })).toBe(true);
+    for (const bad of [
+      { ...base(), tiles: [{ ...tile, id: long }] },
+      { ...base(), tiles: [{ ...tile, label: long }] },
+      { ...base(), tiles: [{ ...tile, value: long }] },
+      {
+        ...base(),
+        tiles: [{ ...tile, change: { direction: 'up', amount: long, comparison: 'vs budget' } }],
+      },
+      { ...base(), tiles: [{ ...tile, forecastRange: { low: '$1', high: long } }] },
+      { ...base(), timeZone: long },
+    ]) {
+      expect(isKpiSnapshot(bad)).toBe(false);
+    }
+  });
+
+  it('checks nested change and range shapes, the date and the timezone', () => {
+    expect(
+      isKpiSnapshot({ ...base(), tiles: [{ ...tile, change: { direction: 'sideways' } }] }),
+    ).toBe(false);
+    expect(
+      isKpiSnapshot({
+        ...base(),
+        tiles: [
+          { ...tile, change: { direction: 'up', amount: '1', comparison: 'x', sentiment: 'meh' } },
+        ],
+      }),
+    ).toBe(false);
+    expect(isKpiSnapshot({ ...base(), tiles: [{ ...tile, forecastRange: { low: 1 } }] })).toBe(
+      false,
+    );
+    expect(isKpiSnapshot({ ...base(), updatedAt: 'yesterday-ish' })).toBe(false);
+    expect(isKpiSnapshot({ ...base(), timeZone: 'Mars/Olympus_Mons' })).toBe(false);
+    expect(isKpiSnapshot({ ...base(), tiles: {} })).toBe(false);
+    expect(isKpiSnapshot([])).toBe(false);
   });
 });

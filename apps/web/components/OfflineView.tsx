@@ -4,20 +4,19 @@ import { Alert, Button } from '@foresite/ui';
 import { formatDateTime, formatTimeZoneAbbreviation } from '@foresite/ui/format';
 import { useEffect, useState } from 'react';
 import { SnapshotTiles } from '@/components/SnapshotTiles';
-import { LAST_SNAPSHOT_KEY, isKpiSnapshot, type KpiSnapshot } from '@/lib/demo-data';
+import type { KpiSnapshot } from '@/lib/demo-data';
+import { readSnapshot } from '@/lib/snapshot-storage';
 
 type State =
   | { status: 'loading' }
   | { status: 'empty' }
   | { status: 'ready'; snapshot: KpiSnapshot };
 
-function readSnapshot(): KpiSnapshot | null {
+function readStoredSnapshot(): KpiSnapshot | null {
   try {
-    const raw = window.localStorage.getItem(LAST_SNAPSHOT_KEY);
-    if (raw === null) return null;
-    const parsed: unknown = JSON.parse(raw);
-    return isKpiSnapshot(parsed) ? parsed : null;
+    return readSnapshot(window.localStorage);
   } catch {
+    // window.localStorage itself can throw when storage is blocked.
     return null;
   }
 }
@@ -26,7 +25,7 @@ export function OfflineView() {
   const [state, setState] = useState<State>({ status: 'loading' });
 
   useEffect(() => {
-    const snapshot = readSnapshot();
+    const snapshot = readStoredSnapshot();
     setState(snapshot ? { status: 'ready', snapshot } : { status: 'empty' });
   }, []);
 
