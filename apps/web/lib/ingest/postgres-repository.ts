@@ -18,7 +18,9 @@ import {
  * Driver-agnostic: it needs only `query(text, params)` and `transaction(fn)`.
  * `fromPostgresJs` wraps the `postgres` driver used in production;
  * the tests wrap PGlite (in-process PostgreSQL). Every statement is
- * parameterised; no value is ever interpolated into SQL text.
+ * parameterised; no value is ever interpolated into SQL text. JSON goes in as
+ * `$n::text::jsonb` so every driver sends the string unchanged (postgres.js
+ * would otherwise JSON-encode a string bound straight to a jsonb parameter).
  *
  * Concurrency: each reading is `insert … on conflict do nothing`; if the key
  * already exists the row is locked with `select … for update` before the
@@ -110,7 +112,7 @@ function parseLineEntryPoints(text: string): Record<string, string> {
 async function insertEvent(tx: SqlExecutor, event: IngestEventToStore): Promise<void> {
   await tx.query(
     `insert into counter_ingest_events (venue_id, device_id, event_type, occurred_at, detail)
-     values ($1::text, $2::text, $3::text, $4::timestamptz, $5::jsonb)`,
+     values ($1::text, $2::text, $3::text, $4::timestamptz, $5::text::jsonb)`,
     [event.venueId, event.deviceId, event.type, event.occurredAt, JSON.stringify(event.detail)],
   );
 }
@@ -119,7 +121,7 @@ async function insertRaw(tx: SqlExecutor, raw: RawPayloadToStore): Promise<boole
   const rows = await tx.query<{ id: unknown }>(
     `insert into counter_raw_payloads
        (venue_id, device_id, provider, payload_hash, payload, received_at, parse_status, error_code)
-     values ($1::text, $2::text, $3::text, $4::text, $5::jsonb, $6::timestamptz, $7::text, $8::text)
+     values ($1::text, $2::text, $3::text, $4::text, $5::text::jsonb, $6::timestamptz, $7::text, $8::text)
      on conflict (device_id, payload_hash) do nothing
      returning id`,
     [

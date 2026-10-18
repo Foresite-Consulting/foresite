@@ -43,7 +43,7 @@ export async function seedDevice(db: SqlExecutor, device: DeviceRecord): Promise
   await db.query(
     `insert into counter_devices
        (device_id, provider, venue_id, entry_point_id, line_entry_points, vendor_serial, active)
-     values ($1::text, $2::text, $3::text, $4::text, $5::jsonb, $6::text, $7::boolean)`,
+     values ($1::text, $2::text, $3::text, $4::text, $5::text::jsonb, $6::text, $7::boolean)`,
     [
       device.deviceId,
       device.provider,
@@ -56,7 +56,7 @@ export async function seedDevice(db: SqlExecutor, device: DeviceRecord): Promise
   );
   await db.query(
     `insert into counter_device_credentials (device_id, venue_id, secret_hashes)
-     values ($1::text, $2::text, (select array_agg(value) from jsonb_array_elements_text($3::jsonb)))`,
+     values ($1::text, $2::text, (select array_agg(value) from jsonb_array_elements_text($3::text::jsonb)))`,
     [device.deviceId, device.venueId, JSON.stringify(device.secretHashes)],
   );
 }
