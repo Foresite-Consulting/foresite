@@ -436,3 +436,24 @@ def test_runs_as_a_module(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "SYNTHETIC" in result.stdout
+
+
+def test_broken_pipe_is_not_an_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def closed_pipe(*_args: object, **_kwargs: object) -> None:
+        raise BrokenPipeError
+
+    monkeypatch.setattr("builtins.print", closed_pipe)
+    assert (
+        main(
+            [
+                "synthetic",
+                "--out-dir",
+                str(tmp_path),
+                "--start",
+                "2025-01-01",
+                "--end",
+                "2025-01-02",
+            ]
+        )
+        == 0
+    )

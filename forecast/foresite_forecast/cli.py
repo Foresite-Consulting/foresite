@@ -145,7 +145,6 @@ def _cmd_baseline(args: argparse.Namespace) -> int:
         print(f"Appended to forecast log {args.log}.")
     # Accuracy to date: live forecasts when there are enough, otherwise a labelled backtest.
     origins = [args.as_of - timedelta(days=i) for i in range(1, 7 * TILE_WEEKS + TILE_HORIZON)]
-    origins = [o for o in origins if o >= actuals.rows[0].trading_day]
     backtest = score(
         forecasts_to_frame(
             model.backtest(
@@ -401,6 +400,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         message = exc.args[0] if isinstance(exc, KeyError) and exc.args else exc
         print(f"error: {message}", file=sys.stderr)
         return 2
+    except BrokenPipeError:
+        # Output piped into something like `head` that stopped reading: not an error.
+        return 0
     except OSError as exc:
         print(f"error: {exc.strerror or exc}: {exc.filename or ''}".rstrip(": "), file=sys.stderr)
         return 2

@@ -58,6 +58,15 @@ def test_score_keeps_only_known_open_days_and_latest_issue() -> None:
     assert set(scored["horizon_bucket"].to_list()) == {"1-7"}
 
 
+def test_identical_issue_times_keep_the_later_row() -> None:
+    actuals = build_actuals(MON, [100])
+    first = make_forecast(day(0), 90)
+    second = make_forecast(day(0), 95)
+    for order, expected in (([first, second], 95), ([second, first], 90)):
+        scored = score(forecasts_to_frame(order), actuals)
+        assert scored["point"].to_list() == [expected]
+
+
 def test_metric_definitions() -> None:
     _, scored = worked_example()
     (row,) = metrics(scored).iter_rows(named=True)
@@ -132,6 +141,11 @@ def test_log_round_trip_and_append(tmp_path: Path) -> None:
     header = path.read_text().splitlines()[0]
     assert header == ",".join(LOG_COLUMNS)
     assert path.read_text().splitlines()[1].startswith("2025-12-31T00:00:00Z,model-a,1,SYNTH-V")
+
+
+def test_writes_leave_no_temporary_files(tmp_path: Path) -> None:
+    write_forecast_log(tmp_path / "log.csv", [make_forecast(day(0), 1)])
+    assert [p.name for p in tmp_path.iterdir()] == ["log.csv"]
 
 
 def test_append_refuses_a_file_that_is_not_a_log(tmp_path: Path) -> None:

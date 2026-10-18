@@ -410,7 +410,10 @@ class ForecastLog:
 
 def latest_issues(log: pl.DataFrame) -> pl.DataFrame:
     """Keep only the latest issue per model x target x horizon."""
-    return log.sort("issued_at").unique(subset=list(FORECAST_KEY), keep="last", maintain_order=True)
+    # Stable sort: for identical issue times the row later in the log wins.
+    return log.sort("issued_at", maintain_order=True).unique(
+        subset=list(FORECAST_KEY), keep="last", maintain_order=True
+    )
 
 
 def _bucket_label_expr(config: IntervalConfig) -> pl.Expr:

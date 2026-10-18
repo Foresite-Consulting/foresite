@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -130,12 +131,21 @@ def read_csv(
 
 
 def write_csv(path: Path, header: Sequence[str], rows: Iterable[Sequence[object]]) -> None:
-    """Write rows as UTF-8 CSV with ``\\n`` line endings. ``None`` is written as an empty field."""
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.writer(handle, lineterminator="\n")
-        writer.writerow(header)
-        for row in rows:
-            writer.writerow(["" if v is None else _format(v) for v in row])
+    """Write rows as UTF-8 CSV with ``\\n`` line endings. ``None`` is written as an empty field.
+
+    Writes to a temporary file in the same folder and then renames it over
+    ``path``, so a crash part-way never leaves a half-written log behind.
+    """
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with tmp.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.writer(handle, lineterminator="\n")
+            writer.writerow(header)
+            for row in rows:
+                writer.writerow(["" if v is None else _format(v) for v in row])
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def _format(value: object) -> str:
