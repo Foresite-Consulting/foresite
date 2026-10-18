@@ -54,8 +54,14 @@ export const foresitePreset: Config = {
       minHeight: { tap: '44px' },
       minWidth: { tap: '44px' },
       borderRadius: { tile: '0.75rem' },
-      ringColor: { DEFAULT: colourVar('action') },
-      ringOffsetColor: { DEFAULT: colourVar('bg') },
+      // Focus is shown with an outline in the link colour (see globals.css and
+      // Button). These defaults only keep Tailwind's base `*` rule valid and
+      // on-theme for any `ring` utility: Tailwind 3 cannot substitute
+      // `<alpha-value>` there, and with no DEFAULT it falls back to its own
+      // blue (rgb(147 197 253 / 0.5)), which bypasses the theme.
+      ringColor: { DEFAULT: 'rgb(var(--color-link))' },
+      ringOpacity: { DEFAULT: '1' },
+      ringOffsetColor: { DEFAULT: 'rgb(var(--color-bg))' },
     },
   },
 };

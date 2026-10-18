@@ -75,6 +75,32 @@ describe('Foresite theme contrast (WCAG 2.1 AA)', () => {
     );
   });
 
+  it('requires the focus indicator (link colour) to reach 3:1 on bg and surface in both modes', () => {
+    const focus = results.filter((r) => r.note?.startsWith('focus indicator'));
+    expect(focus.map((r) => `${r.mode}:${r.fg}/${r.bg}`).sort()).toEqual([
+      'dark:link/bg',
+      'dark:link/surface',
+      'light:link/bg',
+      'light:link/surface',
+    ]);
+    for (const r of focus) {
+      expect(r.advisory).toBe(false);
+      expect(r.required).toBe(3);
+      expect(r.pass).toBe(true);
+    }
+  });
+
+  it('fails a client theme whose link colour cannot carry a focus indicator', () => {
+    // Coral as the link (and so the focus outline) on Mist/white is under 3:1.
+    const weak = structuredClone(foresite);
+    weak.colours.light.link = '#FF6650';
+    const failures = contrastFailures(checkThemeContrast(weak));
+    expect(failures.some((f) => f.note?.startsWith('focus indicator') && f.bg === 'bg')).toBe(true);
+    expect(failures.some((f) => f.note?.startsWith('focus indicator') && f.bg === 'surface')).toBe(
+      true,
+    );
+  });
+
   it('prints a table with a row per pairing', () => {
     const table = formatContrastTable(results);
     const lines = table.split('\n');

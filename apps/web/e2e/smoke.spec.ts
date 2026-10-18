@@ -110,6 +110,75 @@ test.describe('home page', () => {
   });
 });
 
+test.describe('keyboard focus (WCAG 2.4.7)', () => {
+  interface Focused {
+    tag: string;
+    text: string;
+    outlineStyle: string;
+    outlineWidth: string;
+    outlineColor: string;
+    boxShadow: string;
+  }
+
+  /** Press Tab until focus wraps or `max` stops, recording how each focused element is drawn. */
+  async function tabThrough(page: Page, max = 25): Promise<Focused[]> {
+    const seen: Focused[] = [];
+    for (let i = 0; i < max; i += 1) {
+      await page.keyboard.press('Tab');
+      const info = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return null;
+        const style = getComputedStyle(el);
+        return {
+          tag: el.tagName.toLowerCase(),
+          text: el.textContent.trim(),
+          outlineStyle: style.outlineStyle,
+          outlineWidth: style.outlineWidth,
+          outlineColor: style.outlineColor,
+          boxShadow: style.boxShadow,
+        };
+      });
+      if (info === null) break;
+      if (seen.some((s) => s.tag === info.tag && s.text === info.text)) break;
+      seen.push(info);
+    }
+    return seen;
+  }
+
+  function isVisibleIndicator(f: Focused): boolean {
+    const outline =
+      f.outlineStyle !== 'none' &&
+      Number.parseFloat(f.outlineWidth) >= 2 &&
+      f.outlineColor !== 'transparent' &&
+      !/rgba\(.*,\s*0\)$/.test(f.outlineColor);
+    return outline || f.boxShadow !== 'none';
+  }
+
+  // The link token: Ember on light, Mist on dark.
+  const expectedOutline = (scheme: string) =>
+    scheme === 'dark' ? 'rgb(244, 247, 246)' : 'rgb(194, 65, 44)';
+
+  for (const path of ['/', '/offline']) {
+    test(`every element reached by Tab on ${path} shows a focus indicator`, async ({
+      page,
+    }, testInfo) => {
+      const scheme = testInfo.project.use.colorScheme ?? 'light';
+      await page.goto(path);
+      if (path === '/offline')
+        await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+      const focused = await tabThrough(page);
+      const names = focused.map((f) => f.text);
+      expect(names).toContain('Skip to content');
+      expect(names).toContain('Offline view');
+      if (path === '/offline') expect(focused.some((f) => f.tag === 'button')).toBe(true);
+      for (const f of focused) {
+        expect(isVisibleIndicator(f), `${f.tag} "${f.text}": ${JSON.stringify(f)}`).toBe(true);
+        expect(f.outlineColor, `${f.tag} "${f.text}"`).toBe(expectedOutline(scheme));
+      }
+    });
+  }
+});
+
 test.describe('PWA plumbing', () => {
   test('serves a manifest built from the theme', async ({ request }) => {
     const response = await request.get('/manifest.webmanifest');

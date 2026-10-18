@@ -11,19 +11,23 @@ Source of brand files: <who supplied them, date>
 
 ## Colour mapping and contrast (WCAG 2.1 AA: 4.5:1 body text, 3:1 large text, UI and chart lines)
 
-| Pairing                       | Light | Dark | Needs | Pass? |
-| ----------------------------- | ----- | ---- | ----- | ----- |
-| text-primary on bg            |       |      | 4.5   |       |
-| text-primary on surface       |       |      | 4.5   |       |
-| text-secondary on bg          |       |      | 4.5   |       |
-| text-secondary on surface     |       |      | 4.5   |       |
-| link on bg                    |       |      | 4.5   |       |
-| link on surface               |       |      | 4.5   |       |
-| on-action on action           |       |      | 4.5   |       |
-| positive indicator on surface |       |      | 3     |       |
-| negative indicator on surface |       |      | 3     |       |
-| forecast line on surface      |       |      | 3     |       |
-| forecast line on bg           |       |      | 3     |       |
+| Pairing                           | Light | Dark | Needs | Pass? |
+| --------------------------------- | ----- | ---- | ----- | ----- |
+| text-primary on bg                |       |      | 4.5   |       |
+| text-primary on surface           |       |      | 4.5   |       |
+| text-secondary on bg              |       |      | 4.5   |       |
+| text-secondary on surface         |       |      | 4.5   |       |
+| link on bg                        |       |      | 4.5   |       |
+| link on surface                   |       |      | 4.5   |       |
+| on-action on action               |       |      | 4.5   |       |
+| positive indicator on surface     |       |      | 3     |       |
+| negative indicator on surface     |       |      | 3     |       |
+| forecast line on surface          |       |      | 3     |       |
+| forecast line on bg               |       |      | 3     |       |
+| focus indicator (link) on bg      |       |      | 3     |       |
+| focus indicator (link) on surface |       |      | 3     |       |
+
+Keyboard focus is drawn as an outline in the `link` colour, so `link` must reach 3:1 on `bg` and `surface` in both modes (it normally clears this already, since link text needs 4.5:1).
 
 ## Notes
 

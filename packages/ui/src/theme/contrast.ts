@@ -80,6 +80,14 @@ export const THEME_PAIRINGS: readonly Pairing[] = [
   { fg: 'link', bg: 'surface', kind: 'text', advisory: false },
   { fg: 'on-action', bg: 'action', kind: 'text', advisory: false },
   {
+    fg: 'link',
+    bg: 'bg',
+    kind: 'ui',
+    advisory: false,
+    note: 'focus indicator (WCAG 2.4.7 / 1.4.11): the focus outline uses the link colour',
+  },
+  { fg: 'link', bg: 'surface', kind: 'ui', advisory: false, note: 'focus indicator' },
+  {
     fg: 'positive',
     bg: 'surface',
     kind: 'ui',

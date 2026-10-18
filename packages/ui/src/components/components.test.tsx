@@ -26,6 +26,14 @@ describe('Button', () => {
     expect(button.className).toContain('min-h-tap');
   });
 
+  it('shows keyboard focus as an outline in the link colour, never outline-none', () => {
+    render(<Button>Save</Button>);
+    const button = screen.getByRole('button');
+    expect(button.className).toContain('focus-visible:outline-2');
+    expect(button.className).toContain('focus-visible:outline-link');
+    expect(button.className).not.toContain('outline-none');
+  });
+
   it('supports other variants, full width and disabled', () => {
     render(
       <Button variant="secondary" fullWidth disabled>

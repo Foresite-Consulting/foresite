@@ -12,7 +12,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const base =
   'inline-flex min-h-tap min-w-tap items-center justify-center gap-2 rounded-md px-4 py-2 ' +
   'text-body font-semibold leading-none transition-colors ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
+  // Focus outline in the link colour, drawn outside the fill so it sits on bg or surface.
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link ' +
   'disabled:cursor-not-allowed disabled:opacity-50';
 
 const variants: Record<ButtonVariant, string> = {

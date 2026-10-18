@@ -21,19 +21,23 @@ These map existing palette colours onto new semantic tokens. No brand colour was
 
 From `npm run theme:check -- foresite` on 19 Oct 2026. Required pairings all pass; `packages/ui/src/theme/contrast.test.ts` asserts this on every CI run.
 
-| Pairing                    | Light      | Dark       | Needs |
-| -------------------------- | ---------- | ---------- | ----- |
-| text-primary on bg         | 14.48 pass | 14.48 pass | 4.5   |
-| text-primary on surface    | 15.61 pass | 12.02 pass | 4.5   |
-| text-secondary on bg       | 5.11 pass  | 10.86 pass | 4.5   |
-| text-secondary on surface  | 5.50 pass  | 9.02 pass  | 4.5   |
-| link on bg                 | 4.76 pass  | 14.48 pass | 4.5   |
-| link on surface            | 5.13 pass  | 12.02 pass | 4.5   |
-| on-action on action        | 5.40 pass  | 5.40 pass  | 4.5   |
-| positive on surface (icon) | 5.50 pass  | 4.39 pass  | 3     |
-| negative on surface (icon) | 5.13 pass  | 4.48 pass  | 3     |
-| forecast line on surface   | 5.13 pass  | 4.48 pass  | 3     |
-| forecast line on bg        | 4.76 pass  | 5.40 pass  | 3     |
+| Pairing                           | Light      | Dark       | Needs |
+| --------------------------------- | ---------- | ---------- | ----- |
+| text-primary on bg                | 14.48 pass | 14.48 pass | 4.5   |
+| text-primary on surface           | 15.61 pass | 12.02 pass | 4.5   |
+| text-secondary on bg              | 5.11 pass  | 10.86 pass | 4.5   |
+| text-secondary on surface         | 5.50 pass  | 9.02 pass  | 4.5   |
+| link on bg                        | 4.76 pass  | 14.48 pass | 4.5   |
+| link on surface                   | 5.13 pass  | 12.02 pass | 4.5   |
+| on-action on action               | 5.40 pass  | 5.40 pass  | 4.5   |
+| positive on surface (icon)        | 5.50 pass  | 4.39 pass  | 3     |
+| negative on surface (icon)        | 5.13 pass  | 4.48 pass  | 3     |
+| forecast line on surface          | 5.13 pass  | 4.48 pass  | 3     |
+| forecast line on bg               | 4.76 pass  | 5.40 pass  | 3     |
+| focus indicator (link) on bg      | 4.76 pass  | 14.48 pass | 3     |
+| focus indicator (link) on surface | 5.13 pass  | 12.02 pass | 3     |
+
+Keyboard focus is a 2px outline in the `link` colour, offset 2px so it sits on `bg` or `surface`, never on the action fill. Coral is not used for focus: it is under 3:1 on Mist and white.
 
 Advisory (reported, not enforced):
 
