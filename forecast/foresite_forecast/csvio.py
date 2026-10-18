@@ -8,13 +8,16 @@ is reported with its line number instead of being padded or guessed.
 from __future__ import annotations
 
 import csv
+import fcntl
 import io
 import os
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import TextIO
 
 from foresite_forecast.errors import DataValidationError, ValidationIssue
 
@@ -40,16 +43,20 @@ class CsvRow:
     fields: dict[str, str | None]
 
 
+class LogLockedError(Exception):
+    """Another process is writing the same log (its ``.lock`` file is held)."""
+
+
+def _too_large(source: str) -> DataValidationError:
+    return DataValidationError(
+        source,
+        [ValidationIssue(f"file is larger than the {MAX_INPUT_BYTES // (1024 * 1024)} MB limit")],
+    )
+
+
 def _decode(raw: bytes, source: str) -> str:
     if len(raw) > MAX_INPUT_BYTES:
-        raise DataValidationError(
-            source,
-            [
-                ValidationIssue(
-                    f"file is larger than the {MAX_INPUT_BYTES // (1024 * 1024)} MB limit"
-                )
-            ],
-        )
+        raise _too_large(source)
     try:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
@@ -73,7 +80,13 @@ def read_csv(
     Raises :class:`DataValidationError` listing every structural problem: missing,
     unknown or repeated columns, and lines with the wrong number of fields.
     """
-    raw = data.read_bytes() if isinstance(data, Path) else data
+    if isinstance(data, Path):
+        # Check the size before reading, so a huge file is refused without loading it.
+        if data.stat().st_size > MAX_INPUT_BYTES:
+            raise _too_large(source)
+        raw = data.read_bytes()
+    else:
+        raw = data
     text = _decode(raw, source)
     reader = csv.reader(io.StringIO(text, newline=""), strict=True)
     issues: list[ValidationIssue] = []
@@ -130,22 +143,78 @@ def read_csv(
     return header, rows
 
 
-def write_csv(path: Path, header: Sequence[str], rows: Iterable[Sequence[object]]) -> None:
-    """Write rows as UTF-8 CSV with ``\\n`` line endings. ``None`` is written as an empty field.
+def _fsync_dir(folder: Path) -> None:
+    """Flush a folder's entry list to disk, where the platform allows it (not Windows)."""
+    try:
+        fd = os.open(folder, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass  # some file systems refuse fsync on a directory; the rename has still happened
+    finally:
+        os.close(fd)
 
-    Writes to a temporary file in the same folder and then renames it over
-    ``path``, so a crash part-way never leaves a half-written log behind.
+
+@contextmanager
+def atomic_text_writer(path: Path) -> Iterator[TextIO]:
+    """Open a UTF-8 text handle whose content replaces ``path`` only once complete.
+
+    Writes to a temporary file in the same folder, flushes and ``fsync``s it,
+    renames it over ``path`` and then ``fsync``s the folder, so a crash or power
+    cut part-way leaves either the old file or the new one, never half of one.
+    If the ``with`` block raises, ``path`` is untouched.
     """
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
         with tmp.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.writer(handle, lineterminator="\n")
-            writer.writerow(header)
-            for row in rows:
-                writer.writerow(["" if v is None else _format(v) for v in row])
+            yield handle
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(tmp, path)
+        _fsync_dir(path.parent)
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def write_csv(path: Path, header: Sequence[str], rows: Iterable[Sequence[object]]) -> None:
+    """Write rows as UTF-8 CSV with ``\\n`` line endings. ``None`` is written as an empty field.
+
+    Atomic and durable (see :func:`atomic_text_writer`): a crash part-way never
+    leaves a half-written log behind.
+    """
+    with atomic_text_writer(path) as handle:
+        writer = csv.writer(handle, lineterminator="\n")
+        writer.writerow(header)
+        for row in rows:
+            writer.writerow(["" if v is None else _format(v) for v in row])
+
+
+@contextmanager
+def exclusive_lock(path: Path) -> Iterator[None]:
+    """Hold an advisory lock on ``<path>.lock`` for a read-modify-write of ``path``.
+
+    One writer per log: a second process trying to append at the same time
+    gets :class:`LogLockedError` straight away instead of silently losing
+    rows. The lock is ``fcntl.flock`` (POSIX; the forecast job runs on Linux)
+    and is released when the block ends or the process dies. The ``.lock``
+    file is left in place on purpose: deleting it would let two writers lock
+    different files.
+    """
+    lock_path = path.with_name(f"{path.name}.lock")
+    with lock_path.open("a") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise LogLockedError(
+                f"{path} is being written by another process (lock {lock_path} is held); "
+                "only one writer per log at a time, so try again when it has finished"
+            ) from None
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _format(value: object) -> str:

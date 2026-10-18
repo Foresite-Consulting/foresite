@@ -11,7 +11,8 @@ Forecast log format: CSV (UTF-8, one row per forecast). CSV rather than
 Parquet because it needs no extra dependency, a person can open it, it
 appends, and volumes are tiny (28 forecasts x sections x days: tens of
 thousands of rows a year). In production the same columns become a Postgres
-table. Columns, in order:
+table. Until then: one writer per log. Appends take an advisory lock on
+``<log>.lock`` and every write is atomic (temporary file, ``fsync``, rename). Columns, in order:
 
 =================  ========================================================
 issued_at          when it was issued, ISO 8601 with a UTC offset (``Z``)
@@ -65,6 +66,7 @@ import polars as pl
 from foresite_forecast.csvio import (
     ID_PATTERN,
     CsvRow,
+    exclusive_lock,
     parse_iso_date,
     read_csv,
     write_csv,
@@ -235,14 +237,18 @@ def write_forecast_log(path: Path, forecasts: Iterable[Forecast], *, append: boo
     """Write forecasts to a CSV log. With ``append``, add to an existing log.
 
     Appending to an existing file first checks that it is a valid log, so a
-    wrong path never gets a log tacked onto it. Returns the rows written.
+    wrong path never gets a log tacked onto it. An append holds an advisory
+    lock on ``<path>.lock`` for the whole read-modify-write (one writer per log
+    until the Postgres table replaces the CSV); a second concurrent appender
+    gets :class:`~foresite_forecast.csvio.LogLockedError`. Returns the rows written.
     """
     new = list(forecasts)
-    existing: list[Forecast] = []
-    if append and path.exists():
-        existing = read_forecast_log(path)
-    rows = [_forecast_row(f) for f in [*existing, *new]]
-    write_csv(path, LOG_COLUMNS, rows)
+    if not append:
+        write_csv(path, LOG_COLUMNS, [_forecast_row(f) for f in new])
+        return len(new)
+    with exclusive_lock(path):
+        existing = read_forecast_log(path) if path.exists() else []
+        write_csv(path, LOG_COLUMNS, [_forecast_row(f) for f in [*existing, *new]])
     return len(new)
 
 

@@ -38,7 +38,7 @@ from foresite_forecast.accuracy import (
     write_forecast_log,
 )
 from foresite_forecast.baseline import BaselineModel
-from foresite_forecast.csvio import parse_iso_date, write_csv
+from foresite_forecast.csvio import LogLockedError, parse_iso_date, write_csv
 from foresite_forecast.errors import DataValidationError
 from foresite_forecast.model import MAX_HORIZON_DAYS
 from foresite_forecast.schema import (
@@ -396,7 +396,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         code: int = args.func(args)
-    except (DataValidationError, CliError, ValueError, KeyError) as exc:
+    except (DataValidationError, CliError, LogLockedError, ValueError, KeyError) as exc:
         message = exc.args[0] if isinstance(exc, KeyError) and exc.args else exc
         print(f"error: {message}", file=sys.stderr)
         return 2
