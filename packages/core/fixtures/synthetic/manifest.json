@@ -1,0 +1,25 @@
+{
+  "notice": "SYNTHETIC DATA - not from any real venue",
+  "generator": "@foresite/core synthetic",
+  "generatorVersion": 1,
+  "prng": "cyrb128 seeding + sfc32, one stream per (kind, trading day, section)",
+  "venueId": "harbourside-test-venue",
+  "venueName": "Harbourside Test Venue",
+  "timeZone": "Australia/Perth",
+  "seed": 42,
+  "startDay": "2024-12-20",
+  "days": 14,
+  "publicHolidays": 26,
+  "anomalyFlags": {
+    "closedDay": false,
+    "dataGap": false,
+    "lateDuplicate": false
+  },
+  "anomalies": [],
+  "files": {
+    "intervals.csv": 1486,
+    "people_counts.csv": 1058,
+    "weather.csv": 14,
+    "venue.json": 1
+  }
+}

@@ -1,0 +1,1802 @@
+{
+  "description": "Golden test vectors for the Foresite trading-day model. Hand-checked; shared by the TypeScript tests and any future implementation (e.g. Python). Rules: docs/data-dictionary.md. Venues are fictional.",
+  "schemaVersion": 1,
+  "conventions": {
+    "instants": "ISO 8601 UTC (or with an explicit offset)",
+    "sessions": "[open, close): open inclusive, close exclusive",
+    "tradingDayWindow": "[cut-over on date D, cut-over on date D+1)",
+    "repeatedLocalTime": "first occurrence",
+    "skippedLocalTime": "the instant the clocks jump"
+  },
+  "venues": {
+    "perth": {
+      "id": "vector-perth",
+      "name": "Vector Test Venue (Perth)",
+      "timeZone": "Australia/Perth",
+      "cutOver": "05:00",
+      "sections": [
+        {
+          "id": "bar",
+          "name": "Bar",
+          "hours": {
+            "mon": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "tue": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "11:00",
+                "close": "22:00"
+              }
+            ]
+          }
+        },
+        {
+          "id": "restaurant",
+          "name": "Restaurant",
+          "hours": {
+            "tue": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ]
+          }
+        }
+      ],
+      "exceptions": [
+        {
+          "kind": "closure",
+          "date": "2025-12-25",
+          "name": "Christmas Day (closed)"
+        },
+        {
+          "kind": "public_holiday",
+          "date": "2026-01-26",
+          "name": "Australia Day",
+          "hours": {
+            "bar": [
+              {
+                "open": "11:00",
+                "close": "00:00"
+              }
+            ],
+            "restaurant": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "event",
+          "date": "2026-11-07",
+          "name": "Live music (label only, normal hours)"
+        },
+        {
+          "kind": "special_hours",
+          "date": "2026-12-31",
+          "name": "New Year's Eve",
+          "hours": {
+            "bar": [
+              {
+                "open": "11:00",
+                "close": "04:30"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "sydney": {
+      "id": "vector-sydney",
+      "name": "Vector Test Venue (Sydney)",
+      "timeZone": "Australia/Sydney",
+      "cutOver": "05:00",
+      "sections": [
+        {
+          "id": "bar",
+          "name": "Bar",
+          "hours": {
+            "mon": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "tue": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "11:00",
+                "close": "22:00"
+              }
+            ]
+          }
+        },
+        {
+          "id": "restaurant",
+          "name": "Restaurant",
+          "hours": {
+            "tue": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "melbourne": {
+      "id": "vector-melbourne",
+      "name": "Vector Test Venue (Melbourne)",
+      "timeZone": "Australia/Melbourne",
+      "cutOver": "05:00",
+      "sections": [
+        {
+          "id": "bar",
+          "name": "Bar",
+          "hours": {
+            "mon": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "tue": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "11:00",
+                "close": "22:00"
+              }
+            ]
+          }
+        },
+        {
+          "id": "restaurant",
+          "name": "Restaurant",
+          "hours": {
+            "tue": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "adelaide": {
+      "id": "vector-adelaide",
+      "name": "Vector Test Venue (Adelaide)",
+      "timeZone": "Australia/Adelaide",
+      "cutOver": "05:00",
+      "sections": [
+        {
+          "id": "bar",
+          "name": "Bar",
+          "hours": {
+            "mon": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "tue": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "11:00",
+                "close": "22:00"
+              }
+            ]
+          }
+        },
+        {
+          "id": "restaurant",
+          "name": "Restaurant",
+          "hours": {
+            "tue": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "lordhowe": {
+      "id": "vector-lordhowe",
+      "name": "Vector Test Venue (Lord Howe Island)",
+      "timeZone": "Australia/Lord_Howe",
+      "cutOver": "05:00",
+      "sections": [
+        {
+          "id": "bar",
+          "name": "Bar",
+          "hours": {
+            "mon": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "tue": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "11:00",
+                "close": "23:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "11:00",
+                "close": "22:00"
+              }
+            ]
+          }
+        },
+        {
+          "id": "restaurant",
+          "name": "Restaurant",
+          "hours": {
+            "tue": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "wed": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "thu": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "fri": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sat": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ],
+            "sun": [
+              {
+                "open": "12:00",
+                "close": "15:00"
+              },
+              {
+                "open": "17:30",
+                "close": "22:00"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "sydney0230": {
+      "id": "vector-sydney-0230",
+      "name": "Vector Test Venue (Sydney, 02:30 cut-over)",
+      "timeZone": "Australia/Sydney",
+      "cutOver": "02:30",
+      "sections": [
+        {
+          "id": "bar",
+          "name": "Bar",
+          "hours": {
+            "sat": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "tradingDayFor": [
+    {
+      "id": "perth-sat-evening",
+      "venue": "perth",
+      "instant": "2026-10-17T12:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": true
+      },
+      "why": "Sat 20:00 AWST, bar open 11:00-02:00: a normal Saturday night."
+    },
+    {
+      "id": "perth-past-midnight",
+      "venue": "perth",
+      "instant": "2026-10-17T17:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": true
+      },
+      "why": "Sun 01:30 AWST is after midnight but before the 02:00 close, so it belongs to Saturday's trading day."
+    },
+    {
+      "id": "perth-at-close",
+      "venue": "perth",
+      "instant": "2026-10-17T18:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 02:00 AWST is exactly the close. Close is exclusive, so it is outside hours; before the 05:00 cut-over, so still Saturday."
+    },
+    {
+      "id": "perth-just-before-close",
+      "venue": "perth",
+      "instant": "2026-10-17T17:59:59.999Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": true
+      },
+      "why": "The last millisecond before the 02:00 close is inside the session."
+    },
+    {
+      "id": "perth-at-open",
+      "venue": "perth",
+      "instant": "2026-10-17T03:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": true
+      },
+      "why": "Sat 11:00 AWST is exactly the open. Open is inclusive."
+    },
+    {
+      "id": "perth-just-before-open",
+      "venue": "perth",
+      "instant": "2026-10-17T02:59:59.999Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": false
+      },
+      "why": "Sat 10:59:59.999 is before the open: outside hours, Saturday by cut-over."
+    },
+    {
+      "id": "perth-just-before-cutover",
+      "venue": "perth",
+      "instant": "2026-10-17T20:59:59.999Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 04:59:59.999 is before the 05:00 cut-over, so it is still Saturday's trading day."
+    },
+    {
+      "id": "perth-at-cutover",
+      "venue": "perth",
+      "instant": "2026-10-17T21:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-18",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 05:00 AWST is exactly the cut-over: it starts Sunday's trading day (cut-over inclusive for the new day)."
+    },
+    {
+      "id": "perth-weekday-after-close",
+      "venue": "perth",
+      "instant": "2026-10-14T15:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-14",
+        "withinScheduledHours": false
+      },
+      "why": "Wed 23:30 AWST, after the 23:00 weekday close: outside hours, Wednesday."
+    },
+    {
+      "id": "perth-weekday-small-hours",
+      "venue": "perth",
+      "instant": "2026-10-14T18:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-14",
+        "withinScheduledHours": false
+      },
+      "why": "Thu 02:00 AWST, bar closed since 23:00: before the cut-over, so Wednesday's trading day."
+    },
+    {
+      "id": "perth-lunch",
+      "venue": "perth",
+      "instant": "2026-10-17T05:00:00Z",
+      "sectionId": "restaurant",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": true
+      },
+      "why": "Sat 13:00 AWST, inside the 12:00-15:00 lunch session."
+    },
+    {
+      "id": "perth-lunch-close",
+      "venue": "perth",
+      "instant": "2026-10-17T07:00:00Z",
+      "sectionId": "restaurant",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": false
+      },
+      "why": "Sat 15:00 AWST is exactly the lunch close (exclusive)."
+    },
+    {
+      "id": "perth-between-sessions",
+      "venue": "perth",
+      "instant": "2026-10-17T08:00:00Z",
+      "sectionId": "restaurant",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": false
+      },
+      "why": "Sat 16:00 AWST, between lunch (to 15:00) and dinner (from 17:30)."
+    },
+    {
+      "id": "perth-dinner-open",
+      "venue": "perth",
+      "instant": "2026-10-17T09:30:00Z",
+      "sectionId": "restaurant",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": true
+      },
+      "why": "Sat 17:30 AWST is exactly the dinner open (inclusive). A section can have two sessions in a day."
+    },
+    {
+      "id": "perth-closed-weekday",
+      "venue": "perth",
+      "instant": "2026-10-19T05:00:00Z",
+      "sectionId": "restaurant",
+      "expect": {
+        "tradingDay": "2026-10-19",
+        "withinScheduledHours": false
+      },
+      "why": "Mon 13:00 AWST: the restaurant has no Monday hours (closed day)."
+    },
+    {
+      "id": "perth-closure-exception",
+      "venue": "perth",
+      "instant": "2025-12-25T12:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2025-12-25",
+        "withinScheduledHours": false
+      },
+      "why": "Thu 25 Dec 2025 20:00 AWST: a closure exception overrides the Thursday hours."
+    },
+    {
+      "id": "perth-holiday-late",
+      "venue": "perth",
+      "instant": "2026-01-26T15:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-01-26",
+        "withinScheduledHours": true
+      },
+      "why": "Mon 26 Jan 2026 23:30 AWST: public-holiday hours (to 00:00) replace the Monday 23:00 close."
+    },
+    {
+      "id": "perth-holiday-close-midnight",
+      "venue": "perth",
+      "instant": "2026-01-26T16:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-01-26",
+        "withinScheduledHours": false
+      },
+      "why": "Tue 00:00 AWST is the holiday close (exclusive); still the holiday's trading day."
+    },
+    {
+      "id": "perth-holiday-opens-closed-day",
+      "venue": "perth",
+      "instant": "2026-01-26T05:00:00Z",
+      "sectionId": "restaurant",
+      "expect": {
+        "tradingDay": "2026-01-26",
+        "withinScheduledHours": true
+      },
+      "why": "Mon 13:00 AWST on the holiday: holiday hours open the restaurant for lunch although it is normally closed on Mondays."
+    },
+    {
+      "id": "perth-holiday-no-dinner",
+      "venue": "perth",
+      "instant": "2026-01-26T10:00:00Z",
+      "sectionId": "restaurant",
+      "expect": {
+        "tradingDay": "2026-01-26",
+        "withinScheduledHours": false
+      },
+      "why": "Mon 18:00 AWST on the holiday: holiday hours are lunch only."
+    },
+    {
+      "id": "perth-event-label-only",
+      "venue": "perth",
+      "instant": "2026-11-07T12:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-11-07",
+        "withinScheduledHours": true
+      },
+      "why": "Sat 7 Nov 2026 20:00 AWST: an event with no hours keeps the normal Saturday hours."
+    },
+    {
+      "id": "perth-venue-any-section",
+      "venue": "perth",
+      "instant": "2026-10-17T08:00:00Z",
+      "sectionId": null,
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": true
+      },
+      "why": "Sat 16:00 AWST with no section: the bar is open (the restaurant is not), so the venue is within hours."
+    },
+    {
+      "id": "perth-venue-all-closed",
+      "venue": "perth",
+      "instant": "2026-10-19T15:30:00Z",
+      "sectionId": null,
+      "expect": {
+        "tradingDay": "2026-10-19",
+        "withinScheduledHours": false
+      },
+      "why": "Mon 23:30 AWST with no section: bar closed at 23:00, restaurant closed Mondays."
+    },
+    {
+      "id": "perth-nye-late",
+      "venue": "perth",
+      "instant": "2026-12-31T20:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-12-31",
+        "withinScheduledHours": true
+      },
+      "why": "Fri 1 Jan 2027 04:00 AWST: New Year's Eve special hours run to 04:30, so it is inside NYE's session."
+    },
+    {
+      "id": "perth-nye-close",
+      "venue": "perth",
+      "instant": "2026-12-31T20:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-12-31",
+        "withinScheduledHours": false
+      },
+      "why": "Fri 1 Jan 2027 04:30 AWST: the special close (exclusive), before the cut-over, so still NYE."
+    },
+    {
+      "id": "perth-offset-input",
+      "venue": "perth",
+      "instant": "2026-10-18T01:30:00+08:00",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-17",
+        "withinScheduledHours": true
+      },
+      "why": "Same instant as perth-past-midnight, written with a +08:00 offset instead of Z."
+    },
+    {
+      "id": "sydney-dst-start-late",
+      "venue": "sydney",
+      "instant": "2026-10-03T13:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": true
+      },
+      "why": "Sat 3 Oct 2026 23:00 AEST, the night the clocks go forward."
+    },
+    {
+      "id": "sydney-dst-start-before-gap",
+      "venue": "sydney",
+      "instant": "2026-10-03T15:59:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": true
+      },
+      "why": "Sun 01:59 AEST, one minute before the clocks jump from 02:00 AEST to 03:00 AEDT."
+    },
+    {
+      "id": "sydney-dst-start-close-in-gap",
+      "venue": "sydney",
+      "instant": "2026-10-03T16:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 03:00 AEDT. The 02:00 close does not exist that night; it maps to the jump (16:00Z), so this instant is the close (exclusive)."
+    },
+    {
+      "id": "sydney-dst-start-before-cutover",
+      "venue": "sydney",
+      "instant": "2026-10-03T17:59:59.999Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 04:59:59.999 AEDT, before the cut-over: still Saturday."
+    },
+    {
+      "id": "sydney-dst-start-cutover",
+      "venue": "sydney",
+      "instant": "2026-10-03T18:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-04",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 05:00 AEDT starts Sunday's trading day; Saturday's was 23 hours long."
+    },
+    {
+      "id": "sydney-dst-end-late",
+      "venue": "sydney",
+      "instant": "2026-04-04T14:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-04-04",
+        "withinScheduledHours": true
+      },
+      "why": "Sun 5 Apr 2026 01:30 AEDT, the night the clocks go back."
+    },
+    {
+      "id": "sydney-dst-end-close-first-0200",
+      "venue": "sydney",
+      "instant": "2026-04-04T15:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-04-04",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 02:00 AEDT: 02:00 happens twice; the close takes the first, so this is the close (exclusive)."
+    },
+    {
+      "id": "sydney-dst-end-repeated-hour",
+      "venue": "sydney",
+      "instant": "2026-04-04T16:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-04-04",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 02:30 AEST, the second 02:30: after the close, before the cut-over, so Saturday."
+    },
+    {
+      "id": "sydney-dst-end-before-cutover",
+      "venue": "sydney",
+      "instant": "2026-04-04T18:59:59.999Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-04-04",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 04:59:59.999 AEST: still Saturday, whose trading day is 25 hours long."
+    },
+    {
+      "id": "sydney-dst-end-cutover",
+      "venue": "sydney",
+      "instant": "2026-04-04T19:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-04-05",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 05:00 AEST starts Sunday's trading day."
+    },
+    {
+      "id": "melbourne-dst-sunday-open",
+      "venue": "melbourne",
+      "instant": "2026-10-04T00:00:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-04",
+        "withinScheduledHours": true
+      },
+      "why": "Sun 4 Oct 2026 11:00 AEDT, the day after the clocks went forward: open is inclusive."
+    },
+    {
+      "id": "melbourne-dst-sunday-before-open",
+      "venue": "melbourne",
+      "instant": "2026-10-03T23:59:59.999Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-04",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 10:59:59.999 AEDT: after the cut-over, before the open."
+    },
+    {
+      "id": "adelaide-dst-start-before-gap",
+      "venue": "adelaide",
+      "instant": "2026-10-03T16:29:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": true
+      },
+      "why": "Sun 4 Oct 2026 01:59 ACST (UTC+9:30), just before the jump to 03:00 ACDT."
+    },
+    {
+      "id": "adelaide-dst-start-close-in-gap",
+      "venue": "adelaide",
+      "instant": "2026-10-03T16:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 03:00 ACDT: the skipped 02:00 close maps to the jump (16:30Z), exclusive."
+    },
+    {
+      "id": "adelaide-winter-evening",
+      "venue": "adelaide",
+      "instant": "2026-07-15T12:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-07-15",
+        "withinScheduledHours": true
+      },
+      "why": "Wed 15 Jul 2026 22:00 ACST: half-hour zone, standard time, bar open to 23:00."
+    },
+    {
+      "id": "adelaide-dst-start-cutover",
+      "venue": "adelaide",
+      "instant": "2026-10-03T18:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-04",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 05:00 ACDT (UTC+10:30) starts Sunday's trading day."
+    },
+    {
+      "id": "lordhowe-dst-start-before-gap",
+      "venue": "lordhowe",
+      "instant": "2026-10-03T15:29:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": true
+      },
+      "why": "Sun 4 Oct 2026 01:59 LHST (UTC+10:30); at 02:00 the clocks move forward only 30 minutes, to 02:30 LHDT."
+    },
+    {
+      "id": "lordhowe-dst-start-close-in-gap",
+      "venue": "lordhowe",
+      "instant": "2026-10-03T15:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 02:30 LHDT: the 02:00 close is in the 30-minute gap and maps to the jump (15:30Z)."
+    },
+    {
+      "id": "lordhowe-dst-end-repeated-half-hour",
+      "venue": "lordhowe",
+      "instant": "2026-04-04T15:15:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-04-04",
+        "withinScheduledHours": true
+      },
+      "why": "Sun 5 Apr 2026 01:45 LHST, the second 01:45 (clocks went back from 02:00 LHDT to 01:30 LHST). The 02:00 close exists only once, after the repeat, so the bar is still open."
+    },
+    {
+      "id": "lordhowe-dst-end-close",
+      "venue": "lordhowe",
+      "instant": "2026-04-04T15:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-04-04",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 02:00 LHST: the close (exclusive). The session was 15.5 hours of elapsed time."
+    },
+    {
+      "id": "lordhowe-dst-end-cutover",
+      "venue": "lordhowe",
+      "instant": "2026-04-04T18:30:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-04-05",
+        "withinScheduledHours": false
+      },
+      "why": "Sun 05:00 LHST starts Sunday's trading day; Saturday's was 24.5 hours long."
+    },
+    {
+      "id": "sydney0230-spring-jump-starts-sunday",
+      "venue": "sydney0230",
+      "instant": "2026-10-03T16:00:00Z",
+      "sectionId": null,
+      "expect": {
+        "tradingDay": "2026-10-04",
+        "withinScheduledHours": false
+      },
+      "why": "The jump instant (03:00 AEDT) is the start of Sunday's trading day, and the bar's 02:00 close (also the jump) is excluded."
+    },
+    {
+      "id": "sydney0230-spring-before-jump",
+      "venue": "sydney0230",
+      "instant": "2026-10-03T15:59:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": true
+      },
+      "why": "01:59 AEST Sun, one minute before the jump: still Saturday's trading day and inside the bar's session."
+    },
+    {
+      "id": "sydney0230-autumn-second-0230",
+      "venue": "sydney0230",
+      "instant": "2026-04-04T16:30:00Z",
+      "sectionId": null,
+      "expect": {
+        "tradingDay": "2026-04-05",
+        "withinScheduledHours": false
+      },
+      "why": "The second 02:30 (AEST) on the night the clocks go back is an hour into Sunday's trading day, which began at the first 02:30."
+    },
+    {
+      "id": "sydney0230-autumn-between",
+      "venue": "sydney0230",
+      "instant": "2026-04-04T15:29:00Z",
+      "sectionId": null,
+      "expect": {
+        "tradingDay": "2026-04-04",
+        "withinScheduledHours": false
+      },
+      "why": "02:29 AEDT, one minute before the first 02:30: still Saturday's trading day; the bar closed at 02:00 AEDT (15:00Z)."
+    }
+  ],
+  "tradingDayBounds": [
+    {
+      "id": "perth-saturday-bar",
+      "venue": "perth",
+      "tradingDay": "2026-10-17",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-10-16T21:00:00Z",
+        "endUtc": "2026-10-17T21:00:00Z",
+        "durationMinutes": 1440,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-10-17T03:00:00Z",
+            "closeUtc": "2026-10-17T18:00:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Perth has no daylight saving: 24-hour window from 05:00 to 05:00, session crosses midnight."
+    },
+    {
+      "id": "perth-saturday-restaurant",
+      "venue": "perth",
+      "tradingDay": "2026-10-17",
+      "sectionId": "restaurant",
+      "expect": {
+        "startUtc": "2026-10-16T21:00:00Z",
+        "endUtc": "2026-10-17T21:00:00Z",
+        "durationMinutes": 1440,
+        "sessions": [
+          {
+            "sectionId": "restaurant",
+            "open": "12:00",
+            "close": "15:00",
+            "openUtc": "2026-10-17T04:00:00Z",
+            "closeUtc": "2026-10-17T07:00:00Z",
+            "durationMinutes": 180
+          },
+          {
+            "sectionId": "restaurant",
+            "open": "17:30",
+            "close": "22:00",
+            "openUtc": "2026-10-17T09:30:00Z",
+            "closeUtc": "2026-10-17T14:00:00Z",
+            "durationMinutes": 270
+          }
+        ]
+      },
+      "why": "Two sessions in one day: lunch and dinner."
+    },
+    {
+      "id": "perth-saturday-all",
+      "venue": "perth",
+      "tradingDay": "2026-10-17",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2026-10-16T21:00:00Z",
+        "endUtc": "2026-10-17T21:00:00Z",
+        "durationMinutes": 1440,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-10-17T03:00:00Z",
+            "closeUtc": "2026-10-17T18:00:00Z",
+            "durationMinutes": 900
+          },
+          {
+            "sectionId": "restaurant",
+            "open": "12:00",
+            "close": "15:00",
+            "openUtc": "2026-10-17T04:00:00Z",
+            "closeUtc": "2026-10-17T07:00:00Z",
+            "durationMinutes": 180
+          },
+          {
+            "sectionId": "restaurant",
+            "open": "17:30",
+            "close": "22:00",
+            "openUtc": "2026-10-17T09:30:00Z",
+            "closeUtc": "2026-10-17T14:00:00Z",
+            "durationMinutes": 270
+          }
+        ]
+      },
+      "why": "No section: every section's sessions, ordered by open."
+    },
+    {
+      "id": "perth-christmas-closure",
+      "venue": "perth",
+      "tradingDay": "2025-12-25",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2025-12-24T21:00:00Z",
+        "endUtc": "2025-12-25T21:00:00Z",
+        "durationMinutes": 1440,
+        "sessions": [],
+        "exceptionKind": "closure"
+      },
+      "why": "A closure still has a trading-day window (for late or stray data) but no sessions."
+    },
+    {
+      "id": "perth-nye-special",
+      "venue": "perth",
+      "tradingDay": "2026-12-31",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-12-30T21:00:00Z",
+        "endUtc": "2026-12-31T21:00:00Z",
+        "durationMinutes": 1440,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "04:30",
+            "openUtc": "2026-12-31T03:00:00Z",
+            "closeUtc": "2026-12-31T20:30:00Z",
+            "durationMinutes": 1050
+          }
+        ],
+        "exceptionKind": "special_hours"
+      },
+      "why": "Special hours to 04:30, inside the 05:00 cut-over."
+    },
+    {
+      "id": "sydney-dst-start",
+      "venue": "sydney",
+      "tradingDay": "2026-10-03",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-10-02T19:00:00Z",
+        "endUtc": "2026-10-03T18:00:00Z",
+        "durationMinutes": 1380,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-10-03T01:00:00Z",
+            "closeUtc": "2026-10-03T16:00:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Clocks go forward: 23-hour trading day. The skipped 02:00 close maps to the jump, keeping 15 elapsed hours."
+    },
+    {
+      "id": "sydney-dst-end",
+      "venue": "sydney",
+      "tradingDay": "2026-04-04",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-04-03T18:00:00Z",
+        "endUtc": "2026-04-04T19:00:00Z",
+        "durationMinutes": 1500,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-04-04T00:00:00Z",
+            "closeUtc": "2026-04-04T15:00:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Clocks go back: 25-hour trading day. The close takes the first 02:00, keeping 15 elapsed hours."
+    },
+    {
+      "id": "sydney0230-spring-saturday",
+      "venue": "sydney0230",
+      "tradingDay": "2026-10-03",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2026-10-02T16:30:00Z",
+        "endUtc": "2026-10-03T16:00:00Z",
+        "durationMinutes": 1410,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-10-03T01:00:00Z",
+            "closeUtc": "2026-10-03T16:00:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Cut-over 02:30 inside the skipped hour. Starts Sat 02:30 AEST (16:30Z Fri). Sun 4 Oct 02:30 does not exist (02:00 AEST jumps to 03:00 AEDT at 16:00Z), so the day ends at the jump: 23.5 h. The 02:00 close is also skipped and maps to the same jump, so the bar keeps its 15 h."
+    },
+    {
+      "id": "sydney0230-spring-sunday",
+      "venue": "sydney0230",
+      "tradingDay": "2026-10-04",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2026-10-03T16:00:00Z",
+        "endUtc": "2026-10-04T15:30:00Z",
+        "durationMinutes": 1410,
+        "sessions": []
+      },
+      "why": "Starts at the jump (03:00 AEDT, 16:00Z), the first instant after the gap, so it touches Saturday's end. Ends Mon 02:30 AEDT (15:30Z): 23.5 h. Two 23.5 h days, not 23 + 24, because the cut-over sits in the gap."
+    },
+    {
+      "id": "sydney0230-autumn-saturday",
+      "venue": "sydney0230",
+      "tradingDay": "2026-04-04",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2026-04-03T15:30:00Z",
+        "endUtc": "2026-04-04T15:30:00Z",
+        "durationMinutes": 1440,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-04-04T00:00:00Z",
+            "closeUtc": "2026-04-04T15:00:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Cut-over 02:30 inside the repeated hour. Sun 5 Apr 02:30 happens twice (AEDT, then AEST after 03:00 AEDT goes back to 02:00 at 16:00Z); the first occurrence is 02:30 AEDT (15:30Z). Starts Sat 02:30 AEDT (15:30Z Fri): 24 h. The 02:00 close is also repeated and takes its first occurrence (15:00Z): 15 h."
+    },
+    {
+      "id": "sydney0230-autumn-sunday",
+      "venue": "sydney0230",
+      "tradingDay": "2026-04-05",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2026-04-04T15:30:00Z",
+        "endUtc": "2026-04-05T16:30:00Z",
+        "durationMinutes": 1500,
+        "sessions": []
+      },
+      "why": "Starts at the first 02:30 (AEDT, 15:30Z), so the second 02:30 (AEST, 16:30Z Sat) belongs to Sunday. Ends Mon 02:30 AEST (16:30Z): 25 h."
+    },
+    {
+      "id": "sydney-normal-summer",
+      "venue": "sydney",
+      "tradingDay": "2026-10-14",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-10-13T18:00:00Z",
+        "endUtc": "2026-10-14T18:00:00Z",
+        "durationMinutes": 1440,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "23:00",
+            "openUtc": "2026-10-14T00:00:00Z",
+            "closeUtc": "2026-10-14T12:00:00Z",
+            "durationMinutes": 720
+          }
+        ]
+      },
+      "why": "An ordinary daylight-time weekday (UTC+11)."
+    },
+    {
+      "id": "melbourne-day-after-dst-start",
+      "venue": "melbourne",
+      "tradingDay": "2026-10-04",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-10-03T18:00:00Z",
+        "endUtc": "2026-10-04T18:00:00Z",
+        "durationMinutes": 1440,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "22:00",
+            "openUtc": "2026-10-04T00:00:00Z",
+            "closeUtc": "2026-10-04T11:00:00Z",
+            "durationMinutes": 660
+          }
+        ]
+      },
+      "why": "The change happened in the previous trading day, so Sunday is a plain 24 hours."
+    },
+    {
+      "id": "adelaide-dst-start",
+      "venue": "adelaide",
+      "tradingDay": "2026-10-03",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-10-02T19:30:00Z",
+        "endUtc": "2026-10-03T18:30:00Z",
+        "durationMinutes": 1380,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-10-03T01:30:00Z",
+            "closeUtc": "2026-10-03T16:30:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Half-hour zone (UTC+9:30 to +10:30): 23-hour day."
+    },
+    {
+      "id": "adelaide-dst-end",
+      "venue": "adelaide",
+      "tradingDay": "2026-04-04",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-04-03T18:30:00Z",
+        "endUtc": "2026-04-04T19:30:00Z",
+        "durationMinutes": 1500,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-04-04T00:30:00Z",
+            "closeUtc": "2026-04-04T15:30:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Half-hour zone, clocks go back: 25-hour day."
+    },
+    {
+      "id": "lordhowe-dst-start",
+      "venue": "lordhowe",
+      "tradingDay": "2026-10-03",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-10-02T18:30:00Z",
+        "endUtc": "2026-10-03T18:00:00Z",
+        "durationMinutes": 1410,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-10-03T00:30:00Z",
+            "closeUtc": "2026-10-03T15:30:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Lord Howe moves 30 minutes: 23.5-hour day."
+    },
+    {
+      "id": "lordhowe-dst-end",
+      "venue": "lordhowe",
+      "tradingDay": "2026-04-04",
+      "sectionId": "bar",
+      "expect": {
+        "startUtc": "2026-04-03T18:00:00Z",
+        "endUtc": "2026-04-04T18:30:00Z",
+        "durationMinutes": 1470,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-04-04T00:00:00Z",
+            "closeUtc": "2026-04-04T15:30:00Z",
+            "durationMinutes": 930
+          }
+        ]
+      },
+      "why": "24.5-hour day. 02:00 comes after the repeated 01:30-02:00, so the session gains 30 elapsed minutes (930)."
+    }
+  ],
+  "intervals": [
+    {
+      "id": "perth-15",
+      "venue": "perth",
+      "tradingDay": "2026-10-17",
+      "intervalMinutes": 15,
+      "expect": {
+        "count": 96,
+        "shortIntervals": []
+      },
+      "why": "24 hours of 15-minute intervals."
+    },
+    {
+      "id": "perth-60",
+      "venue": "perth",
+      "tradingDay": "2026-10-17",
+      "intervalMinutes": 60,
+      "expect": {
+        "count": 24,
+        "shortIntervals": []
+      },
+      "why": "24 hourly intervals."
+    },
+    {
+      "id": "sydney-dst-start-15",
+      "venue": "sydney",
+      "tradingDay": "2026-10-03",
+      "intervalMinutes": 15,
+      "expect": {
+        "count": 92,
+        "shortIntervals": []
+      },
+      "why": "23 hours: the skipped hour has no intervals."
+    },
+    {
+      "id": "sydney-dst-start-60",
+      "venue": "sydney",
+      "tradingDay": "2026-10-03",
+      "intervalMinutes": 60,
+      "expect": {
+        "count": 23,
+        "shortIntervals": []
+      },
+      "why": "23 hourly intervals; no 02:00 slot."
+    },
+    {
+      "id": "sydney-dst-end-15",
+      "venue": "sydney",
+      "tradingDay": "2026-04-04",
+      "intervalMinutes": 15,
+      "expect": {
+        "count": 100,
+        "shortIntervals": []
+      },
+      "why": "25 hours of 15-minute intervals."
+    },
+    {
+      "id": "sydney-dst-end-60",
+      "venue": "sydney",
+      "tradingDay": "2026-04-04",
+      "intervalMinutes": 60,
+      "expect": {
+        "count": 25,
+        "shortIntervals": [],
+        "repeatedSlots": [
+          {
+            "slot": "02:00",
+            "startUtc": ["2026-04-04T15:00:00Z", "2026-04-04T16:00:00Z"]
+          }
+        ]
+      },
+      "why": "The repeated 02:00 hour gives two intervals, keyed by UTC start."
+    },
+    {
+      "id": "adelaide-dst-start-60",
+      "venue": "adelaide",
+      "tradingDay": "2026-10-03",
+      "intervalMinutes": 60,
+      "expect": {
+        "count": 23,
+        "shortIntervals": []
+      },
+      "why": "Half-hour zone: hourly intervals align to the local clock."
+    },
+    {
+      "id": "lordhowe-dst-start-15",
+      "venue": "lordhowe",
+      "tradingDay": "2026-10-03",
+      "intervalMinutes": 15,
+      "expect": {
+        "count": 94,
+        "shortIntervals": []
+      },
+      "why": "23.5 hours of 15-minute intervals."
+    },
+    {
+      "id": "lordhowe-dst-start-60",
+      "venue": "lordhowe",
+      "tradingDay": "2026-10-03",
+      "intervalMinutes": 60,
+      "expect": {
+        "count": 24,
+        "shortIntervals": [
+          {
+            "localStart": "2026-10-04T02:30+11:00",
+            "slot": "02:00",
+            "durationMinutes": 30
+          }
+        ]
+      },
+      "why": "The 02:00 hour is half skipped: a 30-minute interval starting 02:30 LHDT."
+    },
+    {
+      "id": "lordhowe-dst-end-15",
+      "venue": "lordhowe",
+      "tradingDay": "2026-04-04",
+      "intervalMinutes": 15,
+      "expect": {
+        "count": 98,
+        "shortIntervals": []
+      },
+      "why": "24.5 hours of 15-minute intervals."
+    },
+    {
+      "id": "lordhowe-dst-end-60",
+      "venue": "lordhowe",
+      "tradingDay": "2026-04-04",
+      "intervalMinutes": 60,
+      "expect": {
+        "count": 25,
+        "shortIntervals": [
+          {
+            "localStart": "2026-04-05T01:30+10:30",
+            "slot": "01:00",
+            "durationMinutes": 30
+          }
+        ],
+        "repeatedSlots": [
+          {
+            "slot": "01:00",
+            "startUtc": ["2026-04-04T14:00:00Z", "2026-04-04T15:00:00Z"]
+          }
+        ]
+      },
+      "why": "The repeated 01:30-02:00 forms its own 30-minute interval in the 01:00 slot."
+    }
+  ],
+  "comparisons": [
+    {
+      "id": "swly-saturday",
+      "fn": "sameWeekdayLastYear",
+      "tradingDay": "2026-10-17",
+      "expect": "2025-10-18",
+      "why": "364 days earlier, also a Saturday."
+    },
+    {
+      "id": "swly-leap-day",
+      "fn": "sameWeekdayLastYear",
+      "tradingDay": "2024-02-29",
+      "expect": "2023-03-02",
+      "why": "364 days earlier across a leap day: both Thursdays."
+    },
+    {
+      "id": "sdly-plain",
+      "fn": "sameDateLastYear",
+      "tradingDay": "2026-10-17",
+      "expect": "2025-10-17",
+      "why": "Same calendar date; a Friday, so not like-for-like."
+    },
+    {
+      "id": "sdly-leap-day",
+      "fn": "sameDateLastYear",
+      "tradingDay": "2028-02-29",
+      "expect": "2027-02-28",
+      "why": "29 February has no match, so 28 February."
+    }
+  ]
+}

@@ -1,0 +1,287 @@
+{
+  "notice": "SYNTHETIC DATA - not from any real venue",
+  "id": "harbourside-test-venue",
+  "name": "Harbourside Test Venue",
+  "timeZone": "Australia/Perth",
+  "cutOver": "05:00",
+  "sections": [
+    {
+      "id": "bar",
+      "name": "Bar",
+      "hours": {
+        "mon": [
+          {
+            "open": "11:00",
+            "close": "23:00"
+          }
+        ],
+        "tue": [
+          {
+            "open": "11:00",
+            "close": "23:00"
+          }
+        ],
+        "wed": [
+          {
+            "open": "11:00",
+            "close": "23:00"
+          }
+        ],
+        "thu": [
+          {
+            "open": "11:00",
+            "close": "23:00"
+          }
+        ],
+        "fri": [
+          {
+            "open": "11:00",
+            "close": "02:00"
+          }
+        ],
+        "sat": [
+          {
+            "open": "11:00",
+            "close": "02:00"
+          }
+        ],
+        "sun": [
+          {
+            "open": "11:00",
+            "close": "22:00"
+          }
+        ]
+      }
+    },
+    {
+      "id": "restaurant",
+      "name": "Restaurant",
+      "hours": {
+        "mon": [],
+        "tue": [
+          {
+            "open": "12:00",
+            "close": "15:00"
+          },
+          {
+            "open": "17:30",
+            "close": "21:30"
+          }
+        ],
+        "wed": [
+          {
+            "open": "12:00",
+            "close": "15:00"
+          },
+          {
+            "open": "17:30",
+            "close": "21:30"
+          }
+        ],
+        "thu": [
+          {
+            "open": "12:00",
+            "close": "15:00"
+          },
+          {
+            "open": "17:30",
+            "close": "21:30"
+          }
+        ],
+        "fri": [
+          {
+            "open": "12:00",
+            "close": "15:00"
+          },
+          {
+            "open": "17:30",
+            "close": "22:00"
+          }
+        ],
+        "sat": [
+          {
+            "open": "12:00",
+            "close": "15:00"
+          },
+          {
+            "open": "17:30",
+            "close": "22:00"
+          }
+        ],
+        "sun": [
+          {
+            "open": "12:00",
+            "close": "15:00"
+          },
+          {
+            "open": "17:30",
+            "close": "21:00"
+          }
+        ]
+      }
+    },
+    {
+      "id": "deck",
+      "name": "Deck",
+      "hours": {
+        "mon": [],
+        "tue": [],
+        "wed": [
+          {
+            "open": "12:00",
+            "close": "21:00"
+          }
+        ],
+        "thu": [
+          {
+            "open": "12:00",
+            "close": "21:00"
+          }
+        ],
+        "fri": [
+          {
+            "open": "12:00",
+            "close": "22:00"
+          }
+        ],
+        "sat": [
+          {
+            "open": "12:00",
+            "close": "22:00"
+          }
+        ],
+        "sun": [
+          {
+            "open": "12:00",
+            "close": "21:00"
+          }
+        ]
+      }
+    },
+    {
+      "id": "functions",
+      "name": "Functions",
+      "hours": {
+        "mon": [],
+        "tue": [],
+        "wed": [],
+        "thu": [],
+        "fri": [
+          {
+            "open": "18:00",
+            "close": "00:00"
+          }
+        ],
+        "sat": [
+          {
+            "open": "18:00",
+            "close": "00:00"
+          }
+        ],
+        "sun": []
+      }
+    }
+  ],
+  "exceptions": [
+    {
+      "kind": "closure",
+      "date": "2024-12-25",
+      "name": "Christmas Day (closed)"
+    },
+    {
+      "kind": "public_holiday",
+      "date": "2024-12-26",
+      "name": "Boxing Day",
+      "hours": {
+        "bar": [
+          {
+            "open": "11:00",
+            "close": "22:00"
+          }
+        ],
+        "restaurant": [
+          {
+            "open": "12:00",
+            "close": "15:00"
+          },
+          {
+            "open": "17:30",
+            "close": "21:00"
+          }
+        ],
+        "deck": [
+          {
+            "open": "12:00",
+            "close": "21:00"
+          }
+        ],
+        "functions": []
+      }
+    },
+    {
+      "kind": "special_hours",
+      "date": "2024-12-31",
+      "name": "New Year's Eve",
+      "hours": {
+        "bar": [
+          {
+            "open": "11:00",
+            "close": "02:00"
+          }
+        ],
+        "deck": [
+          {
+            "open": "12:00",
+            "close": "00:30"
+          }
+        ],
+        "functions": [
+          {
+            "open": "19:00",
+            "close": "01:00"
+          }
+        ],
+        "restaurant": [
+          {
+            "open": "12:00",
+            "close": "15:00"
+          },
+          {
+            "open": "17:30",
+            "close": "21:30"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "public_holiday",
+      "date": "2025-01-01",
+      "name": "New Year's Day",
+      "hours": {
+        "bar": [
+          {
+            "open": "11:00",
+            "close": "22:00"
+          }
+        ],
+        "restaurant": [
+          {
+            "open": "12:00",
+            "close": "15:00"
+          },
+          {
+            "open": "17:30",
+            "close": "21:00"
+          }
+        ],
+        "deck": [
+          {
+            "open": "12:00",
+            "close": "21:00"
+          }
+        ],
+        "functions": []
+      }
+    }
+  ]
+}
