@@ -1,0 +1,15 @@
+{
+  "name": "@foresite/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Foresite core model: trading days, sections, budget upload and alert rules. Placeholder until the first build PR.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  }
+}
