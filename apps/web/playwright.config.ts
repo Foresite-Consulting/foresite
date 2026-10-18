@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { ingestServerEnv } from './e2e/ingest-env';
 
 const isCI = process.env.CI === 'true' || process.env.CI === '1';
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3000';
@@ -33,8 +34,11 @@ export default defineConfig({
     },
   ],
   // Smoke tests run against the production build: `npm run build` first.
+  // The ingest tests use in-memory storage with synthetic devices whose secret
+  // is generated for this run (see e2e/ingest-env.ts).
   webServer: {
     command: 'npm run start',
+    env: ingestServerEnv(),
     url: `${baseURL}/api/health`,
     reuseExistingServer: !isCI,
     timeout: 60_000,

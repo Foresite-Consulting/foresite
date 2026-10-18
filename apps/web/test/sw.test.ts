@@ -199,6 +199,8 @@ describe('service worker', () => {
   it('leaves API, auth, non-GET and cross-origin requests alone', async () => {
     for (const request of [
       new Request(`${ORIGIN}/api/health`),
+      new Request(`${ORIGIN}/api/ingest/counters/milesight`),
+      new Request(`${ORIGIN}/api/ingest/counters/milesight`, { method: 'POST', body: '{}' }),
       new Request(`${ORIGIN}/auth/callback`),
       new Request(`${ORIGIN}/`, { method: 'POST' }),
       new Request('https://other.example/_next/static/x.js'),
