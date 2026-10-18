@@ -10,6 +10,7 @@ import {
   jsonResponse,
   readBodyWithLimit,
 } from './http';
+import { checkJsonSafety } from './json-safety';
 import type { IngestLogEntry, IngestLogger } from './log';
 import type { RateLimiter } from './rate-limit';
 import type {
@@ -178,7 +179,11 @@ export async function handleCounterIngest(
   }
 
   const body = await readBodyWithLimit(request, deps.maxBodyBytes);
-  if (!body.ok) return fail(413, 'payload_too_large', who);
+  if (!body.ok) {
+    // The client went away mid-body (review F7): a client problem, logged as a warning.
+    if (body.reason === 'aborted') return fail(400, 'body_aborted', who);
+    return fail(413, 'payload_too_large', who);
+  }
 
   let parsed: unknown;
   try {
@@ -187,6 +192,10 @@ export async function handleCounterIngest(
   } catch {
     return fail(400, 'invalid_json', who);
   }
+  // Too deep for recursive code, or strings jsonb cannot hold (review F4).
+  const unsafe = checkJsonSafety(parsed);
+  if (unsafe !== null)
+    return fail(400, 'invalid_json', { ...who, outcome: `invalid_json_${unsafe}` });
 
   const receivedAtMs = deps.now();
   const receivedAt = new Date(receivedAtMs).toISOString();

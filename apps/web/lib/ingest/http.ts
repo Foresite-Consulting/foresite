@@ -29,12 +29,15 @@ export function isJsonContentType(header: string | null): boolean {
   });
 }
 
-export type BodyReadResult = { ok: true; bytes: Uint8Array } | { ok: false; reason: 'too_large' };
+export type BodyReadResult =
+  | { ok: true; bytes: Uint8Array }
+  | { ok: false; reason: 'too_large' | 'aborted' };
 
 /**
  * Read a request body, stopping as soon as it exceeds `maxBytes`, so an
  * oversized or never-ending body cannot exhaust memory. Does not trust
- * Content-Length (it may be absent with chunked encoding, or wrong).
+ * Content-Length (it may be absent with chunked encoding, or wrong). A stream
+ * error (the client closed the connection mid-body) is `aborted`, not a throw.
  */
 export async function readBodyWithLimit(
   request: Request,
@@ -45,7 +48,13 @@ export async function readBodyWithLimit(
   const chunks: Uint8Array[] = [];
   let total = 0;
   for (;;) {
-    const { done, value } = await reader.read();
+    let next: Awaited<ReturnType<typeof reader.read>>;
+    try {
+      next = await reader.read();
+    } catch {
+      return { ok: false, reason: 'aborted' };
+    }
+    const { done, value } = next;
     if (done) break;
     total += value.byteLength;
     if (total > maxBytes) {

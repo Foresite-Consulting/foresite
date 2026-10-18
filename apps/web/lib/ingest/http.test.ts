@@ -23,6 +23,26 @@ describe('isJsonContentType', () => {
 });
 
 describe('readBodyWithLimit', () => {
+  it('reports a stream error (client abort) as aborted instead of throwing', async () => {
+    let sent = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (!sent) {
+          sent = true;
+          controller.enqueue(new TextEncoder().encode('{"partial":'));
+        } else {
+          controller.error(new Error('aborted'));
+        }
+      },
+    });
+    const request = new Request('https://x', {
+      method: 'POST',
+      body,
+      duplex: 'half',
+    } as RequestInit);
+    expect(await readBodyWithLimit(request, 1_000)).toEqual({ ok: false, reason: 'aborted' });
+  });
+
   it('reads a body under the limit', async () => {
     const result = await readBodyWithLimit(
       new Request('https://x', { method: 'POST', body: 'abc' }),
