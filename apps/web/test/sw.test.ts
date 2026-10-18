@@ -255,6 +255,29 @@ describe('service worker', () => {
     expect(sw.self.skipWaiting).not.toHaveBeenCalled();
   });
 
+  it('does not store /offline when a redirect lands back on /offline', async () => {
+    sw.fetchMock.mockImplementation(async (input) => {
+      const url = new URL(typeof input === 'string' ? input : input.url, ORIGIN);
+      if (url.pathname === '/offline') {
+        // Final URL is exactly /offline, but it got there via a redirect hop.
+        return fetched(
+          new Response(offlineHtml, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          }),
+          `${ORIGIN}/offline`,
+          true,
+        );
+      }
+      return fetched(new Response('asset'), url.href);
+    });
+    await expect(sw.dispatch('install')).rejects.toThrow(
+      /Offline page not stored.*redirected true/,
+    );
+    expect(await sw.cacheStorage.match('/offline')).toBeUndefined();
+    expect(sw.self.skipWaiting).not.toHaveBeenCalled();
+  });
+
   it('does not store /offline unless it is a 200 HTML document', async () => {
     for (const response of [
       html('<html>oops</html>', '/offline', 500),

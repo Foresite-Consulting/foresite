@@ -38,12 +38,13 @@ function cacheKey(url) {
 }
 
 /**
- * True only for the real offline page: a 200 HTML document whose final URL is
- * exactly /offline on this origin. If /offline ever redirects (for example to a
- * sign-in page), the redirect target is not stored as the offline page.
+ * True only for the real offline page: a 200 HTML document, fetched without
+ * any redirect, whose final URL is exactly /offline on this origin. If /offline
+ * ever redirects (for example to a sign-in page, or through a hop that lands
+ * back on /offline), the response is not stored as the offline page.
  */
 function isOfflineDocument(response) {
-  if (response.status !== 200) return false;
+  if (response.status !== 200 || response.redirected !== false) return false;
   let finalUrl;
   try {
     finalUrl = new URL(response.url);
@@ -95,7 +96,7 @@ async function cacheOfflinePage() {
   const response = await fetch(OFFLINE_URL, { cache: 'no-store', credentials: 'same-origin' });
   if (!isOfflineDocument(response)) {
     throw new Error(
-      `Offline page not stored: status ${response.status}, url ${response.url || '(none)'}`,
+      `Offline page not stored: status ${response.status}, redirected ${response.redirected}, url ${response.url || '(none)'}`,
     );
   }
   await cache.put(OFFLINE_URL, response.clone());
