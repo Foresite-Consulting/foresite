@@ -47,6 +47,16 @@ create table counter_device_credentials (
                              check (cardinality(secret_hashes) between 1 and 2
                                     and array_position(secret_hashes, null) is null),
   updated_at     timestamptz not null default now(),
+  -- Every element is an encoded scrypt hash (apps/web/lib/ingest/secrets.ts):
+  -- scrypt$v=1$n=<N>,r=<r>,p=<p>$<16-byte salt, base64url>$<32-byte hash, base64url>.
+  -- A pasted secret, or anything else, is refused. At most two elements
+  -- (checked above), indexed from 1.
+  constraint counter_device_credentials_scrypt_format check (
+    array_lower(secret_hashes, 1) = 1
+    and secret_hashes[1] ~ '^scrypt\$v=1\$n=[0-9]{1,7},r=[0-9]{1,2},p=[0-9]\$[A-Za-z0-9_-]{22}\$[A-Za-z0-9_-]{43}$'
+    and (cardinality(secret_hashes) < 2
+         or secret_hashes[2] ~ '^scrypt\$v=1\$n=[0-9]{1,7},r=[0-9]{1,2},p=[0-9]\$[A-Za-z0-9_-]{22}\$[A-Za-z0-9_-]{43}$')
+  ),
   foreign key (device_id, venue_id) references counter_devices (device_id, venue_id)
     on update cascade on delete cascade
 );
@@ -166,9 +176,11 @@ alter table counter_raw_payloads        enable row level security;
 alter table counter_readings            enable row level security;
 alter table counter_ingest_events       enable row level security;
 
--- Supabase grants table privileges to anon/authenticated by default. Take them
--- away here so access depends on explicit grants plus policies, not on RLS
--- alone. Skipped where those roles do not exist (plain PostgreSQL, PGlite).
+-- Supabase grants table and sequence privileges to anon/authenticated by
+-- default. Take them away here so access depends on explicit grants plus
+-- policies, not on RLS alone. That includes the identity sequences behind the
+-- id columns, so those roles cannot read or advance them either. Skipped where
+-- the roles do not exist (plain PostgreSQL, PGlite).
 do $$
 declare
   role_name text;
@@ -178,6 +190,12 @@ begin
       execute format(
         'revoke all on table counter_devices, counter_device_credentials, counter_raw_payloads, '
         'counter_readings, counter_ingest_events from %I', role_name);
+      execute format(
+        'revoke all on sequence %s, %s, %s from %I',
+        pg_get_serial_sequence('counter_raw_payloads', 'id'),
+        pg_get_serial_sequence('counter_readings', 'id'),
+        pg_get_serial_sequence('counter_ingest_events', 'id'),
+        role_name);
     end if;
   end loop;
 end

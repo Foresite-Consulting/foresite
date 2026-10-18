@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { PGlite } from '@electric-sql/pglite';
+import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createMigratedPglite, fromPglite, MIGRATION_PATH, seedDevice } from './pglite';
 import { PostgresIngestRepository } from './postgres-repository';
@@ -124,6 +124,36 @@ describe('migration 0001_counter_ingest.sql', () => {
     ).rejects.toThrow(/check/i);
   });
 
+  it('only stores secret hashes in the scrypt format (review F6)', async () => {
+    const [real] = CONTRACT_DEVICE.secretHashes;
+    const set = (hashes: string[]) =>
+      db.query(
+        `update counter_device_credentials set secret_hashes = $2::text[] where device_id = $1`,
+        [CONTRACT_DEVICE.deviceId, hashes],
+      );
+    for (const bad of [
+      ['a-plain-secret-pasted-by-mistake'],
+      [`${real} `],
+      [`${real}`, 'not-a-hash'],
+      [`${real} ${real}`],
+      ['scrypt$v=1$n=16384,r=8,p=1$short$short'],
+      [real!.replace('scrypt$v=1', 'scrypt$v=2')],
+    ]) {
+      await expect(set(bad), bad.join(',')).rejects.toThrow(
+        /counter_device_credentials_scrypt_format/,
+      );
+    }
+    // An array indexed from 2, so secret_hashes[1] is null.
+    await expect(
+      db.query(
+        `update counter_device_credentials set secret_hashes = $2::text[] where device_id = $1`,
+        [CONTRACT_DEVICE.deviceId, `[2:2]={"${real!}"}`],
+      ),
+    ).rejects.toThrow(/counter_device_credentials_scrypt_format/);
+    await set([real!]);
+    await set([real!, real!]);
+  });
+
   it('only allows known event types', async () => {
     await expect(
       db.query(
@@ -148,6 +178,43 @@ describe('migration 0001_counter_ingest.sql', () => {
       await db.exec(`reset role`);
     }
   });
+
+  it('revokes table and sequence privileges from the Supabase API roles (review F6)', async () => {
+    // A fresh database set up like Supabase: anon/authenticated exist and get
+    // privileges on new tables and sequences by default.
+    const supa = await PGlite.create();
+    try {
+      await supa.exec(`
+        create role anon nologin;
+        create role authenticated nologin;
+        alter default privileges in schema public grant all on tables to anon, authenticated;
+        alter default privileges in schema public grant all on sequences to anon, authenticated;
+      `);
+      await supa.exec(readFileSync(MIGRATION_PATH, 'utf8'));
+      const { rows } = await supa.query<{ role: string; object: string; allowed: boolean }>(
+        `select r.role, s.object,
+                case when s.kind = 'S'
+                  then has_sequence_privilege(r.role, s.object, 'usage')
+                    or has_sequence_privilege(r.role, s.object, 'select')
+                    or has_sequence_privilege(r.role, s.object, 'update')
+                  else has_table_privilege(r.role, s.object, 'select')
+                    or has_table_privilege(r.role, s.object, 'insert')
+                    or has_table_privilege(r.role, s.object, 'update')
+                    or has_table_privilege(r.role, s.object, 'delete')
+                end as allowed
+           from (values ('anon'), ('authenticated')) r(role)
+           cross join (select relname::text as object, relkind::text as kind from pg_class
+                        where relname like 'counter\\_%' and relkind in ('r', 'S')) s
+          order by 1, 2`,
+      );
+      // 5 tables + 3 identity sequences, for each role.
+      expect(rows).toHaveLength(16);
+      expect(rows.filter((r) => r.object.endsWith('_seq'))).toHaveLength(6);
+      expect(rows.filter((r) => r.allowed)).toEqual([]);
+    } finally {
+      await supa.close();
+    }
+  }, 60_000);
 
   it('is a single transaction (begin/commit) so a failure leaves nothing behind', () => {
     const sql = readFileSync(MIGRATION_PATH, 'utf8');
