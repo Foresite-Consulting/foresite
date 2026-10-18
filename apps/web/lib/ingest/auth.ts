@@ -1,3 +1,4 @@
+import type { VerifiedCredentialCache } from './auth-cache';
 import type { DeviceRecord, IngestRepository } from './repository';
 import { getDummyHash, SECRET_MAX_LENGTH, verifyDeviceSecret } from './secrets';
 
@@ -12,6 +13,8 @@ import { getDummyHash, SECRET_MAX_LENGTH, verifyDeviceSecret } from './secrets';
  * Every attempt runs exactly two scrypt checks (one per rotation slot, a dummy
  * hash filling any empty slot or an unknown device), so the response time does
  * not reveal whether a device id exists, is inactive, or has one or two secrets.
+ * The one exception is the optional `VerifiedCredentialCache`, which skips
+ * scrypt only for a credential that already passed (see auth-cache.ts).
  */
 
 /** Foresite device ids: short, URL- and log-safe. */
@@ -55,6 +58,7 @@ export async function authenticateDevice(
   provider: string,
   header: string | null,
   verify: VerifySecret = verifyDeviceSecret,
+  cache?: VerifiedCredentialCache,
 ): Promise<AuthResult> {
   const credentials = parseBasicAuth(header);
   const dummy = await getDummyHash();
@@ -66,6 +70,15 @@ export async function authenticateDevice(
 
   const device = await repository.findDevice(provider, credentials.deviceId);
   const hashes = device?.secretHashes.slice(0, MAX_SECRETS_PER_DEVICE) ?? [];
+  const cacheKey = `${provider}:${credentials.deviceId}`;
+
+  if (device !== null && cache !== undefined) {
+    const cachedSlot = cache.lookup(cacheKey, credentials.secret, hashes);
+    if (cachedSlot !== null) {
+      if (!device.active) return { ok: false, reason: 'inactive' };
+      return { ok: true, device, slot: cachedSlot };
+    }
+  }
   const slots = Array.from({ length: MAX_SECRETS_PER_DEVICE }, (_, i) => hashes[i] ?? dummy);
   const results = await Promise.all(slots.map((hash) => verify(credentials.secret, hash)));
   // A slot only counts if it held a real hash.
@@ -74,5 +87,6 @@ export async function authenticateDevice(
   if (device === null) return { ok: false, reason: 'unknown_device' };
   if (slot === -1) return { ok: false, reason: 'bad_secret' };
   if (!device.active) return { ok: false, reason: 'inactive' };
+  cache?.remember(cacheKey, credentials.secret, hashes, slot + 1);
   return { ok: true, device, slot: slot + 1 };
 }

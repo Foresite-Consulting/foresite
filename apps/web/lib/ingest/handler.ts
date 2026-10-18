@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getCounterAdapter, hashPayload } from '@foresite/connectors/counters';
 import { authenticateDevice } from './auth';
+import type { VerifiedCredentialCache } from './auth-cache';
 import { judgeReadingClock, type ClockPolicy } from './clock';
 import {
   clientAddress,
@@ -42,6 +43,8 @@ export interface IngestDeps {
   requireHttps: boolean;
   now: () => number;
   logger: IngestLogger;
+  /** Optional: skip scrypt for credentials that recently passed. */
+  authCache?: VerifiedCredentialCache;
 }
 
 export const WWW_AUTHENTICATE = 'Basic realm="Foresite counter ingest", charset="UTF-8"';
@@ -116,6 +119,8 @@ export async function handleCounterIngest(
       repository,
       adapter.provider,
       request.headers.get('authorization'),
+      undefined,
+      deps.authCache,
     );
   } catch {
     return fail(

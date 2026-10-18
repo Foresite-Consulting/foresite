@@ -1,5 +1,6 @@
 import 'server-only';
 import postgres from 'postgres';
+import { VerifiedCredentialCache } from './auth-cache';
 import { loadIngestConfig, type IngestConfig } from './config';
 import type { IngestDeps } from './handler';
 import { consoleIngestLogger } from './log';
@@ -84,6 +85,7 @@ export function getIngestDeps(): IngestDeps {
     requireHttps: config.requireHttps,
     now: Date.now,
     logger: consoleIngestLogger,
+    authCache: new VerifiedCredentialCache(),
   };
   return cached;
 }
