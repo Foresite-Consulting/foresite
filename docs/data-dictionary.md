@@ -4,6 +4,8 @@ One definition for every term, field and KPI, used by the app, the reports and t
 
 Implementation: `packages/core` (TypeScript). Golden test vectors that any other implementation (e.g. the Python forecast engine) must pass: `packages/core/test-vectors/trading-day.json`.
 
+Each definition gives its formula, source fields, ex or inc GST, and the trading-day basis. Every fact is keyed by **trading day** (open to close in the venue's local time, not midnight to midnight) and **section**.
+
 ## Conventions
 
 | Thing       | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -113,3 +115,63 @@ Day loadings use the trading day's weekday, so the hours after midnight on a Sat
 ### `venue.json` and `manifest.json`
 
 `venue.json` is the parsed venue configuration used (hours, holidays, closures). `manifest.json` records the generator version, PRNG, seed, start day, day count, time zone, anomaly flags, every anomaly injected (`closed_day`, `data_gap`, `late_duplicate`, with day, section and first interval) and row counts. No timestamps, so the output is byte-for-byte reproducible.
+
+## Forecasts
+
+Owner: `forecast/` (Python). Full rules and their rationale: `docs/adr/0004-forecast-baseline-and-accuracy.md`. Forecasts are estimates, never guarantees; every forecast shown carries its likely range and its accuracy to date.
+
+### Inputs
+
+| Field                    | Type                        | Basis                      | Definition                                                                                                     |
+| ------------------------ | --------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `venue_id`               | identifier                  | -                          | Venue. 1-64 of `A-Z a-z 0-9 _ . -`, starting with a letter or digit                                            |
+| `section_id`             | identifier                  | -                          | Section within the venue (bar, restaurant, deck...)                                                            |
+| `trading_day`            | date                        | trading day, venue local   | The open-to-close trading day the figures belong to                                                            |
+| `status`                 | `open`, `closed`, `missing` | trading day                | `open`: traded, figures known. `closed`: did not trade. `missing`: figures unknown. Blank means `open`         |
+| `net_sales_ex_gst_cents` | integer ≥ 0                 | cents, **ex GST**, per day | Net sales after refunds and discounts, excluding GST. Required on open days                                    |
+| `covers`                 | integer ≥ 0                 | count, per day             | Guests served. Optional                                                                                        |
+| `labour_cost_cents`      | integer ≥ 0                 | cents, per day             | Labour cost for the trading day. Optional; whether on-costs are included is set by the client's KPI definition |
+| calendar `kind`          | `public_holiday`, `closed`  | trading day                | Public holiday (with a stable `holiday_key`, e.g. `easter_monday`) or a planned closure                        |
+
+### Forecast record (forecast log)
+
+| Field            | Type           | Definition                                                                                                                                                                                            |
+| ---------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `issued_at`      | UTC timestamp  | When the forecast was issued                                                                                                                                                                          |
+| `model_id`       | identifier     | Model that made it, e.g. `baseline-swly-trend`                                                                                                                                                        |
+| `model_version`  | identifier     | Rules or model version; `+cfg.<hash>` when baseline settings differ from the defaults                                                                                                                 |
+| `metric`         | identifier     | The input column forecast, e.g. `net_sales_ex_gst_cents` (so the forecast is in cents ex GST)                                                                                                         |
+| `as_of`          | date           | Last trading day whose actuals were complete when issued. Nothing after it is used                                                                                                                    |
+| `target_day`     | date           | Trading day forecast                                                                                                                                                                                  |
+| `horizon_days`   | integer 1-28   | `target_day − as_of`                                                                                                                                                                                  |
+| `point`          | integer ≥ 0    | Point estimate, same unit and GST basis as the metric. Blank when `rule = unforecastable`                                                                                                             |
+| `low`, `high`    | integer ≥ 0    | Likely range, `low ≤ point ≤ high`. About 8 in 10 actuals should fall inside with the default 10th-90th percentiles                                                                                   |
+| `rule`           | identifier     | How the point was made: `closed_calendar`, `holiday_last_year`, `same_weekday_last_year`, `same_weekday_last_year_neighbours`, `recent_same_weekday_median`, `unforecastable` (or a model's own rule) |
+| `trend_factor`   | number 0.5-2.0 | Baseline: last 8 weeks against the same 8 weeks a year earlier (364 days), usable day pairs only                                                                                                      |
+| `trend_rule`     | identifier     | `trend_window`, `trend_capped`, `trend_insufficient_history`, `trend_zero_base`                                                                                                                       |
+| `interval_rule`  | identifier     | How the range was made: `empirical_weekday_horizon`, `empirical_horizon`, `fallback_fixed_width`, `closed`, `zero_point_recent_max`                                                                   |
+| `interval_n`     | integer        | Number of past errors behind the range                                                                                                                                                                |
+| `reference_days` | dates          | Days the point was built from                                                                                                                                                                         |
+
+### Accuracy measures
+
+Computed per model × venue × metric over **scored** forecasts: the model gave a point, the target day was `open` and its actual is known, keeping only the latest issue per target and horizon. Closed and missing days are never scored. Weeks are Monday to Sunday by target trading day.
+
+| Measure                 | Formula                                                   | Notes                                                                                        |
+| ----------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| WAPE (headline)         | Σ\|actual − point\| ÷ Σ actual                            | Shown as "typical error". Blank if Σ actual = 0                                              |
+| MAPE                    | mean of \|actual − point\| ÷ actual, over actual > 0 only | Zero-actual days are left out (`mape_n` counts the rest)                                     |
+| Bias                    | Σ(point − actual) ÷ Σ actual                              | Positive: forecasts run high                                                                 |
+| Coverage                | share with low ≤ actual ≤ high                            | Shown as "in the likely range N of M times"                                                  |
+| Rolling 4-week          | the above over the 4 calendar weeks ending each week      | `weeks_with_data` says how many of the 4 had scored forecasts                                |
+| Accuracy to date (tile) | coverage and WAPE of 7-day-ahead forecasts, last 10 weeks | Needs at least 28 scored forecasts; labelled "based on a backtest" until live history exists |
+
+### Champion/challenger
+
+| Term              | Definition                                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Weekly comparison | WAPE of challenger and baseline on matched forecasts (same venue, section, metric, target day, horizon; both have a point; actual known)      |
+| Evaluable week    | Complete week with ≥ 7 matched forecasts, ≥ 90% of the baseline's scored forecasts matched, and actuals summing to more than 0                |
+| Worse week        | Challenger WAPE > baseline WAPE (a tie is not worse)                                                                                          |
+| Rollback          | Last 4 complete weeks all evaluable and worse → serve the baseline and raise a `forecast_rollback` alert. Any evaluable not-worse week → keep |
+| Phase 2 gate      | On the hold-out weeks (default last 8): all evaluable, pooled WAPE strictly lower, and better in at least ⌈0.75 × weeks⌉ weeks (6 of 8)       |
