@@ -180,6 +180,10 @@ class SeriesBaseline:
         self._trend: dict[date, Trend] = {}
         self._points: dict[tuple[date, int], PointEstimate] = {}
         self._residuals: dict[date, Residuals] = {}
+        # Concatenated residuals for origins [_table_first, _table_last], sorted by origin.
+        self._table: Residuals | None = None
+        self._table_first: date | None = None
+        self._table_last: date | None = None
 
     # -- lookups -----------------------------------------------------------------
 
@@ -337,14 +341,49 @@ class SeriesBaseline:
         self._residuals[origin] = result
         return result
 
+    def prepare(self, first_origin: date, last_origin: date) -> None:
+        """Precompute past errors for forecasts issued from ``first_origin`` to ``last_origin``.
+
+        Only a speed-up for backtests: results are identical with or without it.
+        """
+        lookback = self.config.intervals.lookback_days
+        self._ensure_table(first_origin - timedelta(days=lookback), last_origin - timedelta(days=1))
+
+    def _ensure_table(self, first: date, last: date) -> Residuals:
+        first = max(first, self.series.start)
+        if (
+            self._table is not None
+            and self._table_first is not None
+            and self._table_last is not None
+            and self._table_first <= first
+            and last <= self._table_last
+        ):
+            return self._table
+        if self._table_first is not None and self._table_last is not None:
+            first, last = min(first, self._table_first), max(last, self._table_last)
+        parts = [
+            self._residuals_from(first + timedelta(days=i)) for i in range((last - first).days + 1)
+        ]
+        self._table = Residuals.concat(parts)
+        self._table_first, self._table_last = first, last
+        return self._table
+
     def calibrator(self, as_of: date) -> IntervalCalibrator:
         """Interval bands for forecasts issued on ``as_of``, from earlier forecasts only."""
         lookback = self.config.intervals.lookback_days
-        first = max(as_of - timedelta(days=lookback), self.series.start)
-        parts = [
-            self._residuals_from(first + timedelta(days=i)) for i in range((as_of - first).days)
-        ]
-        return IntervalCalibrator(Residuals.concat(parts), as_of.toordinal(), self.config.intervals)
+        table = self._ensure_table(as_of - timedelta(days=lookback), as_of - timedelta(days=1))
+        # IntervalCalibrator applies the exact window; slicing here only saves work.
+        lo, hi = np.searchsorted(
+            table.origins, [as_of.toordinal() - lookback, as_of.toordinal()], side="left"
+        )
+        window = Residuals(
+            table.origins[lo:hi],
+            table.targets[lo:hi],
+            table.horizons[lo:hi],
+            table.weekdays[lo:hi],
+            table.ratios[lo:hi],
+        )
+        return IntervalCalibrator(window, as_of.toordinal(), self.config.intervals)
 
     def forecasts(
         self,
@@ -520,8 +559,11 @@ class BaselineModel:
         if any(o > last for o in origins):
             raise ValueError(f"every origin must be on or before {last.isoformat()}")
         out: list[Forecast] = []
+        unique = sorted(set(origins))
         for engine in self._engines(actuals, metric, calendar):
-            for origin in sorted(set(origins)):
+            if unique:
+                engine.prepare(unique[0], unique[-1])
+            for origin in unique:
                 out.extend(
                     engine.forecasts(
                         origin,

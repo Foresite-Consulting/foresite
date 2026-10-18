@@ -250,6 +250,11 @@ def latest_complete_week_start(evaluation_day: date) -> date:
 
 
 def _single_model(log: pl.DataFrame, label: str) -> str:
+    if log.height == 0:
+        raise ValueError(
+            f"the {label} log is empty: there are no forecasts to evaluate. A live model that "
+            "issued nothing is an outage; check the forecast job"
+        )
     ids = sorted(set(log["model_id"].to_list()))
     if len(ids) != 1:
         raise ValueError(
@@ -317,11 +322,26 @@ def _compare_week(
     return WeekComparison(week_start, pairs, baseline_n, c_wape, b_wape, verdict, note)
 
 
-def _groups(m: _Matched, challenger_log: pl.DataFrame) -> list[tuple[str, str]]:
-    keys = set(m.baseline_scored.select("venue_id", "metric").unique().iter_rows()) | set(
+def _groups(baseline_log: pl.DataFrame, challenger_log: pl.DataFrame) -> list[tuple[str, str]]:
+    """Every venue x metric in either log, so none is silently skipped."""
+    keys = set(baseline_log.select("venue_id", "metric").unique().iter_rows()) | set(
         challenger_log.select("venue_id", "metric").unique().iter_rows()
     )
     return sorted((str(v), str(k)) for v, k in keys)
+
+
+def rollback_verdict(weeks: Sequence[WeekComparison], required_weeks: int = 4) -> Decision:
+    """The rollback rule on its own, for the last ``required_weeks`` complete weeks.
+
+    ``keep`` if any week is evaluable and not worse; ``rollback_to_baseline``
+    only if there are exactly ``required_weeks`` weeks and every one is worse;
+    otherwise ``insufficient_data``.
+    """
+    if any(w.verdict == "not_worse" for w in weeks):
+        return "keep"
+    if len(weeks) == required_weeks and all(w.verdict == "worse" for w in weeks):
+        return "rollback_to_baseline"
+    return "insufficient_data"
 
 
 def decide_rollback(
@@ -338,11 +358,12 @@ def decide_rollback(
     last_week = latest_complete_week_start(evaluation_day or actuals.last_day())
     week_starts = [last_week - timedelta(weeks=i) for i in range(cfg.rollback_weeks - 1, -1, -1)]
     decisions: list[RollbackDecision] = []
-    for venue_id, metric in _groups(m, challenger_log):
+    for venue_id, metric in _groups(baseline_log, challenger_log):
         weeks = tuple(_compare_week(m, venue_id, metric, w, cfg) for w in week_starts)
         period = f"{format_day(weeks[0].week_start)} to {format_day(weeks[-1].week_end)}"
+        verdict = rollback_verdict(weeks, cfg.rollback_weeks)
         good = [w for w in weeks if w.verdict == "not_worse"]
-        if good:
+        if verdict == "keep":
             reasons = tuple(
                 f"week of {format_day(w.week_start)}: not worse than the baseline ({w.note})"
                 for w in good
@@ -350,7 +371,7 @@ def decide_rollback(
             decisions.append(
                 RollbackDecision(venue_id, metric, "keep", m.challenger_id, reasons, weeks, None)
             )
-        elif all(w.verdict == "worse" for w in weeks):
+        elif verdict == "rollback_to_baseline":
             alert = RollbackAlert(
                 alert_id=hashlib.sha256(
                     f"{venue_id}|{metric}|{m.challenger_id}|{weeks[-1].week_start}".encode()
@@ -432,7 +453,7 @@ def beats_baseline(
     m = _match(challenger_log, baseline_log, actuals)
     required = cfg.weeks_required(len(weeks_list))
     results: list[GateResult] = []
-    for venue_id, metric in _groups(m, challenger_log):
+    for venue_id, metric in _groups(baseline_log, challenger_log):
         weeks = tuple(_compare_week(m, venue_id, metric, w, cfg.selection) for w in weeks_list)
         better = sum(
             1

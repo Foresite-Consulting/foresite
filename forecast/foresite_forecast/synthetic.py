@@ -220,7 +220,8 @@ def synthetic_challenger(
     if degrade_from is not None:
         new_point = pl.when(pl.col("target_day") >= degrade_from).then(bad).otherwise(good)
     scale = pl.when(point > 0).then(new_point / point).otherwise(1.0)
-    name = model_id or f"synthetic-{quality}-challenger"
+    label = "degrading" if degrade_from is not None else quality
+    name = model_id or f"synthetic-{label}-challenger"
     out = df.with_columns(
         point_new=new_point.round(0).cast(pl.Int64),
         scale=scale,

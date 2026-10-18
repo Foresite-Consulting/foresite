@@ -315,7 +315,8 @@ def _cmd_synthetic_challenger(args: argparse.Namespace) -> int:
     )
     forecasts = frame_to_forecasts(frame)
     write_forecast_log(args.out, forecasts)
-    print(f"Wrote {len(forecasts)} SYNTHETIC {args.quality} challenger forecasts to {args.out}.")
+    name = str(frame["model_id"][0]) if frame.height else "none"
+    print(f"Wrote {len(forecasts)} SYNTHETIC challenger forecasts ({name}) to {args.out}.")
     return 0
 
 

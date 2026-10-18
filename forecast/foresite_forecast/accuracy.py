@@ -539,7 +539,9 @@ def accuracy_report(scored: pl.DataFrame) -> AccuracyReport:
     return AccuracyReport(
         overall=metrics(scored),
         by_horizon=metrics(scored, ["horizon_days"]),
-        by_horizon_bucket=metrics(scored, ["horizon_bucket"]),
+        by_horizon_bucket=metrics(scored, ["horizon_bucket"]).sort(
+            [*GROUP_KEYS, pl.col("horizon_bucket").str.split("-").list.first().cast(pl.Int64)]
+        ),
         by_weekday=metrics(scored, ["weekday"]),
         by_section=metrics(scored, ["section_id"]),
         by_week=metrics(scored, ["week_start"]),
