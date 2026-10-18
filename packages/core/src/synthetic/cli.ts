@@ -8,7 +8,7 @@
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ZodError } from 'zod';
-import { writeDataset } from './write';
+import { DatasetConflictError, writeDataset } from './write';
 import {
   DEFAULT_SYNTHETIC_SEED,
   DEFAULT_SYNTHETIC_START_DAY,
@@ -28,6 +28,7 @@ Generates SYNTHETIC data for the fictional Harbourside Test Venue.
   --closed-day        Add an unplanned closed day.
   --data-gap          Add a two-hour gap in the bar's sales rows.
   --late-duplicate    Add three late duplicate rows.
+  --force             Overwrite a folder that holds a different dataset.
   --help              Show this help.
 `;
 
@@ -62,6 +63,7 @@ export function runSynthCli(argv: readonly string[], io: CliIo): number {
         'closed-day': { type: 'boolean', default: false },
         'data-gap': { type: 'boolean', default: false },
         'late-duplicate': { type: 'boolean', default: false },
+        force: { type: 'boolean', default: false },
         help: { type: 'boolean', default: false },
       },
     });
@@ -87,7 +89,7 @@ export function runSynthCli(argv: readonly string[], io: CliIo): number {
       },
     });
     const outDir = resolve(io.cwd, values.out);
-    const written = writeDataset(dataset, outDir);
+    const written = writeDataset(dataset, outDir, { force: values.force });
     io.log(
       [
         `SYNTHETIC DATA written to ${outDir}`,
@@ -101,6 +103,10 @@ export function runSynthCli(argv: readonly string[], io: CliIo): number {
     );
     return 0;
   } catch (error) {
+    if (error instanceof DatasetConflictError) {
+      io.error(error.message);
+      return 2;
+    }
     if (error instanceof ZodError) {
       io.error(
         `Invalid options:\n${error.issues.map((issue) => `  ${issue.path.join('.')}: ${issue.message}`).join('\n')}`,

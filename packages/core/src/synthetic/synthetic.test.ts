@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -435,6 +435,41 @@ describe('synth CLI', { timeout: 30_000 }, () => {
         io,
       ),
     ).toThrow(/ENOTDIR|EEXIST/);
+  });
+
+  it('refuses to overwrite a different dataset unless --force', () => {
+    const dir = join(scratch, 'overwrite');
+    const first = silentIo();
+    expect(runSynthCli(['--days', '2', '--seed', '1', '--out', dir], first.io)).toBe(0);
+    const before = readFileSync(join(dir, 'intervals.csv'));
+    // The same dataset again is fine (same bytes).
+    expect(runSynthCli(['--days', '2', '--seed', '1', '--out', dir], silentIo().io)).toBe(0);
+    const base = ['--out', dir];
+    for (const args of [
+      ['--days', '2', '--seed', '2'],
+      ['--days', '3', '--seed', '1'],
+      ['--days', '2', '--seed', '1', '--start', '2025-01-01'],
+      ['--days', '2', '--seed', '1', '--time-zone', 'Australia/Sydney'],
+      ['--days', '2', '--seed', '1', '--anomalies'],
+    ]) {
+      const { io, err } = silentIo();
+      expect(runSynthCli([...base, ...args], io), args.join(' ')).toBe(2);
+      expect(err.join('\n')).toMatch(/already holds a different synthetic dataset.*--force/);
+      expect(readFileSync(join(dir, 'intervals.csv'))).toEqual(before);
+    }
+    // --force overwrites.
+    const forced = silentIo();
+    expect(runSynthCli(['--days', '2', '--seed', '2', '--out', dir, '--force'], forced.io)).toBe(0);
+    expect(readFileSync(join(dir, 'manifest.json'), 'utf8')).toMatch(/"seed": 2,/);
+  });
+
+  it('refuses a folder whose manifest.json cannot be read', () => {
+    const dir = join(scratch, 'bad-manifest');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'manifest.json'), 'not json');
+    const { io, err } = silentIo();
+    expect(runSynthCli(['--days', '1', '--out', dir], io)).toBe(2);
+    expect(err.join('\n')).toMatch(/unreadable manifest\.json/);
   });
 
   it('prints help', () => {
