@@ -8,6 +8,7 @@ export {
   type ResolvedTheme,
   type SemanticKey,
   type ThemeAssetExtension,
+  type ThemeIcon,
   type ThemeMode,
   type ThemeTokens,
   type TypeScale,

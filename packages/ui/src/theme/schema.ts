@@ -68,6 +68,25 @@ const assetFile = z
       .join(', ')}`,
   });
 
+/**
+ * A web app manifest icon. `sizes` is stated, never guessed from the file
+ * name: "192x192", several sizes separated by spaces, or "any" for an SVG.
+ */
+const iconSchema = z
+  .object({
+    src: assetFile,
+    sizes: z
+      .string()
+      .regex(
+        /^(any|[1-9][0-9]{0,4}x[1-9][0-9]{0,4}( [1-9][0-9]{0,4}x[1-9][0-9]{0,4})*)$/,
+        'must be like "192x192", several such sizes separated by spaces, or "any"',
+      ),
+    purpose: z.enum(['any', 'maskable', 'monochrome']).optional(),
+  })
+  .strict();
+
+export type ThemeIcon = z.infer<typeof iconSchema>;
+
 /** A palette name (e.g. "ink") or a literal hex colour. */
 const colourRef = z.string().min(1, 'must name a palette colour or give a hex value');
 
@@ -110,7 +129,7 @@ const clientSchema = z
       .nullable(),
     logo: assetFile.nullable(),
     logoOnDark: assetFile.nullable(),
-    icons: z.array(assetFile),
+    icons: z.array(iconSchema),
     favicon: assetFile.nullable(),
   })
   .strict();
@@ -162,7 +181,8 @@ export interface ResolvedTheme {
   assets: {
     logo: string | null;
     logoOnDark: string | null;
-    icons: string[];
+    /** Manifest icons, with their sizes and purpose as declared in the theme. */
+    icons: ThemeIcon[];
     favicon: string | null;
   };
   rules: string[];

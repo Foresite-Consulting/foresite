@@ -42,7 +42,11 @@ beforeEach(() => {
       logo: 'logo.svg',
       logoOnDark: null,
       favicon: null,
-      icons: ['icon-192.png', 'notes.txt', 'missing.png'],
+      icons: [
+        { src: 'icon-192.png', sizes: '192x192' },
+        { src: 'notes.txt', sizes: '192x192' },
+        { src: 'missing.png', sizes: '512x512' },
+      ],
     },
   } as unknown as ResolvedTheme;
 });

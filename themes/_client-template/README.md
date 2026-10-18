@@ -5,7 +5,7 @@ Source of brand files: <who supplied them, date>
 ## How to fill this in
 
 1. Copy this folder to `themes/<client-slug>/` and fill `tokens.json` from the client's own brand files. Any key left `null` falls back to `themes/foresite`.
-2. Add the logo (SVG preferred), `logo-on-dark.svg` if the client has one, the app icons (192, 512 and maskable 512 PNG) and the favicon. Never redraw a logo from a description; if files are missing, leave the key `null` and flag it.
+2. Add the logo (SVG preferred), `logo-on-dark.svg` if the client has one, the app icons (192, 512 and maskable 512 PNG) and the favicon. List each icon in `client.icons` as `{ "src": "icon-192.png", "sizes": "192x192", "purpose": "any" }`; `sizes` must match the file's real pixel size (the manifest uses it as given) and `purpose` is `any`, `maskable` or `monochrome`. Asset files sit directly in the theme folder and must be `.png`, `.svg`, `.ico` or `.webp`. Never redraw a logo from a description; if files are missing, leave the key `null` and flag it.
 3. Run `npm run theme:check -- <client-slug>` and paste the results below. Every required pairing must pass before the theme ships. If one fails, change the mapping (for example a darker accent for `link`), never the client's colours.
 4. Set `NEXT_PUBLIC_THEME=<client-slug>` in the client's environments.
 

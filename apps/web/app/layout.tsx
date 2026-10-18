@@ -8,7 +8,10 @@ import './globals.css';
 
 export function generateMetadata(): Metadata {
   const theme = getTheme();
-  const icon192 = theme.assets.icons.find((file) => file.includes('192'));
+  // Browser tab and home-screen icons: never the maskable one (it has no safe-zone crop there).
+  const plainIcons = theme.assets.icons.filter((icon) => icon.purpose !== 'maskable');
+  const appleIcon =
+    plainIcons.find((icon) => icon.sizes.split(' ').includes('192x192')) ?? plainIcons[0];
   return {
     title: {
       default: theme.appName,
@@ -19,10 +22,8 @@ export function generateMetadata(): Metadata {
     appleWebApp: { capable: true, title: theme.appShortName, statusBarStyle: 'default' },
     formatDetection: { telephone: false },
     icons: {
-      icon: theme.assets.icons
-        .filter((file) => !file.includes('maskable'))
-        .map((file) => ({ url: `/theme-assets/${file}` })),
-      apple: icon192 !== undefined ? [{ url: `/theme-assets/${icon192}` }] : [],
+      icon: plainIcons.map((icon) => ({ url: `/theme-assets/${icon.src}`, sizes: icon.sizes })),
+      apple: appleIcon !== undefined ? [{ url: `/theme-assets/${appleIcon.src}` }] : [],
     },
   };
 }

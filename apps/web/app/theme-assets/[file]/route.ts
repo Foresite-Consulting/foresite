@@ -25,7 +25,7 @@ export async function GET(_request: Request, context: { params: Promise<{ file: 
       theme.assets.logo,
       theme.assets.logoOnDark,
       theme.assets.favicon,
-      ...theme.assets.icons,
+      ...theme.assets.icons.map((icon) => icon.src),
     ].filter((name): name is string => name !== null),
   );
   if (!allowed.has(file)) return notFound();

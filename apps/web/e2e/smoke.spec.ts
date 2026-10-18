@@ -209,8 +209,11 @@ test.describe('PWA plumbing', () => {
     expect(manifest.display).toBe('standalone');
     expect(manifest.theme_color).toMatch(/^#[0-9A-F]{6}$/);
     expect(manifest.background_color).toMatch(/^#[0-9A-F]{6}$/);
-    expect(manifest.icons).toHaveLength(3);
-    expect(manifest.icons.some((icon) => icon.purpose === 'maskable')).toBe(true);
+    expect(manifest.icons.map(({ src, sizes, purpose }) => ({ src, sizes, purpose }))).toEqual([
+      { src: '/theme-assets/icon-192.png', sizes: '192x192', purpose: 'any' },
+      { src: '/theme-assets/icon-512.png', sizes: '512x512', purpose: 'any' },
+      { src: '/theme-assets/icon-maskable-512.png', sizes: '512x512', purpose: 'maskable' },
+    ]);
     for (const icon of manifest.icons) {
       const iconResponse = await request.get(icon.src);
       expect(iconResponse.status(), icon.src).toBe(200);

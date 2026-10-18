@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { themeAssetContentType } from '@foresite/ui/theme';
 import { getTheme } from '@/lib/theme';
 
 export const dynamic = 'force-static';
@@ -19,11 +20,12 @@ export default function manifest(): MetadataRoute.Manifest {
     dir: 'ltr',
     background_color: theme.colours.light.bg,
     theme_color: theme.colours.light.bg,
-    icons: theme.assets.icons.map((file) => ({
-      src: `/theme-assets/${file}`,
-      sizes: file.includes('512') ? '512x512' : '192x192',
-      type: 'image/png',
-      purpose: file.includes('maskable') ? 'maskable' : 'any',
+    // Sizes and purpose come from the theme as declared, never from file names.
+    icons: theme.assets.icons.map((icon) => ({
+      src: `/theme-assets/${icon.src}`,
+      sizes: icon.sizes,
+      purpose: icon.purpose ?? 'any',
+      type: themeAssetContentType(icon.src),
     })),
   };
 }

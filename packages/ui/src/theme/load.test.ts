@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -45,6 +45,20 @@ describe('loadTheme (Foresite base)', () => {
     }
     expect(theme.type.sans).toBe('IBM Plex Sans');
     expect(theme.credit).toBe('Built by Foresite');
+    expect(theme.assets.icons).toEqual([
+      { src: 'icon-192.png', sizes: '192x192', purpose: 'any' },
+      { src: 'icon-512.png', sizes: '512x512', purpose: 'any' },
+      { src: 'icon-maskable-512.png', sizes: '512x512', purpose: 'maskable' },
+    ]);
+  });
+
+  it('declares icon sizes that match the real PNG files', () => {
+    const theme = loadTheme({ slug: BASE_THEME_SLUG, themesDir: realThemesDir });
+    for (const icon of theme.assets.icons) {
+      const png = readFileSync(join(theme.dir, icon.src));
+      // PNG IHDR: width and height are big-endian uint32 at bytes 16 and 20.
+      expect(`${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`, icon.src).toBe(icon.sizes);
+    }
   });
 
   it('defaults to the foresite theme when no env var is set', () => {
@@ -152,6 +166,35 @@ describe('loadTheme (client overlay)', () => {
     for (const bad of ['../tokens.json', '../../secret.png', 'sub/logo.svg', '.hidden.png']) {
       writeClient('acme', { client: { favicon: bad } });
       expect(() => loadTheme({ slug: 'acme', themesDir }), bad).toThrow(/client\.favicon/);
+    }
+  });
+
+  it('takes icon sizes and purpose as declared', () => {
+    writeClient('acme', {
+      client: {
+        icons: [
+          { src: 'app.svg', sizes: 'any' },
+          { src: 'big.png', sizes: '256x256 512x512', purpose: 'monochrome' },
+        ],
+      },
+    });
+    expect(loadTheme({ slug: 'acme', themesDir }).assets.icons).toEqual([
+      { src: 'app.svg', sizes: 'any' },
+      { src: 'big.png', sizes: '256x256 512x512', purpose: 'monochrome' },
+    ]);
+  });
+
+  it('rejects the old string-only icon list and bad sizes or purposes', () => {
+    const cases: [unknown, RegExp][] = [
+      [['icon-192.png'], /client\.icons\.0/],
+      [[{ src: 'icon.png' }], /client\.icons\.0\.sizes/],
+      [[{ src: 'icon.png', sizes: '192' }], /client\.icons\.0\.sizes: must be like "192x192"/],
+      [[{ src: 'icon.png', sizes: '192x192', purpose: 'badge' }], /client\.icons\.0\.purpose/],
+      [[{ src: 'icon.gif', sizes: '192x192' }], /client\.icons\.0\.src: must end in/],
+    ];
+    for (const [icons, message] of cases) {
+      writeClient('acme', { client: { icons } });
+      expect(() => loadTheme({ slug: 'acme', themesDir }), JSON.stringify(icons)).toThrow(message);
     }
   });
 
