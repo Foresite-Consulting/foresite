@@ -45,7 +45,7 @@ npm run test:watch                 # unit tests on change
 npm run build -w apps/web && npm run test:e2e   # Playwright smoke tests against the production build
 npm run theme:check -- foresite    # WCAG AA contrast table for a theme folder
 npm run coverage                   # unit tests with coverage thresholds (packages/core: 95%)
-npm run synth -w packages/core -- --days 730 --seed 42 --out ./synthetic   # SYNTHETIC venue data as CSV
+npm run synth -w packages/core -- --days 730 --seed 42 --out ./synthetic   # SYNTHETIC venue data as CSV, into the git-ignored /synthetic/
 cd forecast && uv sync --locked && uv run pytest
 ```
 

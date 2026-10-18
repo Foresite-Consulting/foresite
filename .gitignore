@@ -17,3 +17,6 @@ apps/web/next-env.d.ts
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+
+# Synthetic data written by `npm run synth` (the README example writes here)
+/synthetic/
