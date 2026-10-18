@@ -161,8 +161,15 @@ function isIanaZoneName(zone: string): boolean {
 }
 
 function canonicalZone(zone: string): string {
-  return Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(zone).timeZoneId;
+  // zod runs transforms on input that already has issues, so this must not throw.
+  try {
+    return Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(zone).timeZoneId;
+  } catch {
+    return zone;
+  }
 }
+
+const isClock = (value: string): boolean => CLOCK_PATTERN.test(value);
 
 function checkSessions(
   sessions: readonly Session[],
@@ -171,11 +178,12 @@ function checkSessions(
   path: (string | number)[],
   ctx: z.RefinementCtx,
 ): void {
-  const placed = sessions.map((session, index) => ({
-    session,
-    index,
-    ...sessionOffsets(session, cutOverMinutes),
-  }));
+  // Malformed times are reported by the field schema; skip them here.
+  const placed = sessions.flatMap((session, index) =>
+    isClock(session.open) && isClock(session.close)
+      ? [{ session, index, ...sessionOffsets(session, cutOverMinutes) }]
+      : [],
+  );
   for (const { session, index, open, close } of placed) {
     if (session.open === session.close) {
       ctx.addIssue({
@@ -236,6 +244,9 @@ const venueObjectSchema = z
  */
 export const venueSchema = venueObjectSchema
   .superRefine((venue, ctx) => {
+    // zod runs refinements on input that already has issues: a malformed
+    // cut-over is reported by its field schema, so stop here.
+    if (!isClock(venue.cutOver)) return;
     const cutOverMinutes = clockToMinutes(venue.cutOver);
     const sectionIds = new Set<string>();
     venue.sections.forEach((section, sectionIndex) => {

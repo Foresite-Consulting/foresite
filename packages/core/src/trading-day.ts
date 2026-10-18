@@ -201,7 +201,7 @@ export function placedSessions(
 /** Internal: trading day containing an instant, by the cut-over windows. */
 export function tradingDayOfMs(venue: Venue, ms: number): TradingDay {
   const cache = cacheFor(venue);
-  const local = zoned(ms, venue.timeZone);
+  const local = zoned(ms, venue.timeZone).toPlainDateTime();
   const minutes = local.hour * 60 + local.minute;
   let day: TradingDay = (
     minutes >= cache.cutOverMinutes

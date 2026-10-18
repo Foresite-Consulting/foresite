@@ -47,6 +47,8 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm run test
+      - name: Coverage thresholds (workspaces that set them)
+        run: npm run coverage
       - name: Theme contrast (Foresite base)
         run: npm run theme:check -- foresite
       - name: Build

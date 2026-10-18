@@ -2,7 +2,7 @@
   "name": "@foresite/core",
   "version": "0.1.0",
   "private": true,
-  "description": "Foresite core model: trading days, sections, budget upload and alert rules. Placeholder until the first build PR.",
+  "description": "Foresite core model: trading days, sections and venue calendar, interval bucketing, and a deterministic synthetic venue data generator.",
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
@@ -10,7 +10,10 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "synth": "tsx src/synthetic/cli-entry.ts",
+    "synth:fixture": "tsx src/synthetic/cli-entry.ts --days 14 --seed 42 --out fixtures/synthetic"
   },
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1",

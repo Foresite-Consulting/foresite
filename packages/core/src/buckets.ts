@@ -18,16 +18,9 @@
  *   in exactly one of that day's intervals, and they tile the day exactly.
  * - A bucket is keyed by trading day, section and interval UTC start.
  */
-import { Temporal } from '@js-temporal/polyfill';
+import { type Temporal } from '@js-temporal/polyfill';
 import { addDays, type TradingDay } from './time/dates';
-import {
-  formatLocal,
-  formatUtc,
-  toEpochMs,
-  transitionsBetween,
-  zoned,
-  type InstantInput,
-} from './time/instant';
+import { formatUtc, toEpochMs, transitionsBetween, zoned, type InstantInput } from './time/instant';
 import { cacheFor, dayStartMs, memo, placedSessions, tradingDayOfMs } from './trading-day';
 import type { Venue } from './venue/schema';
 
@@ -67,6 +60,12 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
+/** `2026-04-05T02:30+10:00`: local wall-clock minute plus the UTC offset in force. */
+function localLabel(local: Temporal.PlainDateTime, offset: string): string {
+  const date = `${String(local.year).padStart(4, '0')}-${pad2(local.month)}-${pad2(local.day)}`;
+  return `${date}T${pad2(local.hour)}:${pad2(local.minute)}${offset}`;
+}
+
 function buildIntervals(
   venue: Venue,
   day: TradingDay,
@@ -78,26 +77,20 @@ function buildIntervals(
   const intervals: MsInterval[] = [];
   let cursor = startMs;
   while (cursor < endMs) {
-    const local = zoned(cursor, venue.timeZone);
+    const zonedCursor = zoned(cursor, venue.timeZone);
+    // Read the fields from a PlainDateTime: the polyfill recomputes them on
+    // every ZonedDateTime getter, which is slow.
+    const local = zonedCursor.toPlainDateTime();
+    const offset = zonedCursor.offset;
     const minuteOfDay = local.hour * 60 + local.minute;
     const slotMinutes = Math.floor(minuteOfDay / intervalMinutes) * intervalMinutes;
-    // The next aligned clock boundary, read at the current UTC offset.
-    const boundary = local
-      .toPlainDate()
-      .toPlainDateTime()
-      .add({ minutes: slotMinutes + intervalMinutes });
-    const alignedEnd = Temporal.ZonedDateTime.from(
-      {
-        year: boundary.year,
-        month: boundary.month,
-        day: boundary.day,
-        hour: boundary.hour,
-        minute: boundary.minute,
-        timeZone: venue.timeZone,
-        offset: local.offset,
-      },
-      { offset: 'use' },
-    ).epochMilliseconds;
+    // The next aligned clock boundary. Until the next transition the UTC
+    // offset is fixed, so local time and UTC advance together and the
+    // boundary is the remaining wall-clock minutes away in elapsed time.
+    // (Any transition before it is caught by the min() below.)
+    const intoSlotMs =
+      (minuteOfDay - slotMinutes) * 60_000 + local.second * 1000 + local.millisecond;
+    const alignedEnd = cursor - intoSlotMs + intervalMinutes * 60_000;
     const nextTransition = transitions.find((t) => t > cursor) ?? Number.POSITIVE_INFINITY;
     const next = Math.min(alignedEnd, endMs, nextTransition);
     intervals.push({
@@ -106,7 +99,7 @@ function buildIntervals(
       startUtc: formatUtc(cursor),
       endUtc: formatUtc(next),
       durationMinutes: (next - cursor) / 60_000,
-      localStart: formatLocal(cursor, venue.timeZone),
+      localStart: localLabel(local, offset),
       slot: `${pad2(Math.floor(slotMinutes / 60))}:${pad2(slotMinutes % 60)}`,
       startMs: cursor,
       endMs: next,

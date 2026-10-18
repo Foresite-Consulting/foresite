@@ -46,9 +46,14 @@ export function toEpochMs(input: InstantInput): number {
   throw new RangeError('Instant must be a Date, epoch milliseconds or an ISO 8601 string');
 }
 
-/** Format epoch milliseconds as an ISO 8601 UTC string, e.g. `2026-10-17T12:00:00Z`. */
+/**
+ * Format epoch milliseconds as ISO 8601 UTC: `2026-10-17T12:00:00Z`, or
+ * `2026-10-17T12:00:00.250Z` when there are milliseconds (always three
+ * digits). UTC only, so no time zone is involved.
+ */
 export function formatUtc(epochMs: number): string {
-  return Temporal.Instant.fromEpochMilliseconds(epochMs).toString();
+  const iso = new Date(epochMs).toISOString();
+  return iso.endsWith('.000Z') ? `${iso.slice(0, -5)}Z` : iso;
 }
 
 /** The instant in the venue's zone. */
