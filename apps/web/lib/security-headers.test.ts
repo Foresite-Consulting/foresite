@@ -52,6 +52,8 @@ describe('static headers', () => {
     expect(get('X-Frame-Options')).toBe('DENY');
     expect(get('Permissions-Policy')).toContain('camera=()');
     expect(get('Permissions-Policy')).toContain('geolocation=()');
+    // Chromium warns on features it does not recognise.
+    expect(get('Permissions-Policy')).not.toMatch(/bluetooth|interest-cohort/);
     expect(get('Strict-Transport-Security')).toMatch(/max-age=\d+/);
   });
 

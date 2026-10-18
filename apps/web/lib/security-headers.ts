@@ -47,6 +47,18 @@ export interface Header {
   value: string;
 }
 
+/** Browser features this app never uses; each is disabled for every origin. */
+export const PERMISSIONS_POLICY_FEATURES = [
+  'camera',
+  'microphone',
+  'geolocation',
+  'payment',
+  'usb',
+  'magnetometer',
+  'gyroscope',
+  'accelerometer',
+] as const;
+
 /** Headers that do not change per request. */
 export const staticSecurityHeaders: Header[] = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -54,10 +66,10 @@ export const staticSecurityHeaders: Header[] = [
   // Belt and braces alongside CSP frame-ancestors for older browsers.
   { key: 'X-Frame-Options', value: 'DENY' },
   {
+    // Only features Chromium recognises: an unknown feature (e.g. bluetooth,
+    // interest-cohort) makes Chrome log a console warning on every page.
     key: 'Permissions-Policy',
-    value:
-      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), ' +
-      'magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()',
+    value: PERMISSIONS_POLICY_FEATURES.map((feature) => `${feature}=()`).join(', '),
   },
   { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
   { key: 'X-DNS-Prefetch-Control', value: 'off' },

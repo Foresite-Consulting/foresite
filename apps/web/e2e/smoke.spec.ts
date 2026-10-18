@@ -1,11 +1,22 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-/** Collect console errors and uncaught exceptions for the life of the page. */
+/**
+ * Console messages we cannot fix from this repo. Each entry needs a reason.
+ * Keep this list empty unless a message genuinely comes from outside our code
+ * (the browser itself or a dependency we cannot change).
+ */
+const CONSOLE_ALLOW_LIST: { pattern: RegExp; reason: string }[] = [];
+
+/** Collect console errors, warnings and uncaught exceptions for the life of the page. */
 function watchConsole(page: Page): string[] {
   const errors: string[] = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
+    const type = message.type();
+    if (type !== 'error' && type !== 'warning') return;
+    const text = message.text();
+    if (CONSOLE_ALLOW_LIST.some(({ pattern }) => pattern.test(text))) return;
+    errors.push(`${type}: ${text}`);
   });
   page.on('pageerror', (error) => {
     errors.push(error.message);
@@ -72,6 +83,7 @@ test.describe('home page', () => {
     expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect(headers['x-frame-options']).toBe('DENY');
     expect(headers['permissions-policy']).toContain('camera=()');
+    expect(headers['permissions-policy']).not.toMatch(/bluetooth|interest-cohort/);
     expect(headers['x-powered-by']).toBeUndefined();
 
     const csp = headers['content-security-policy'] ?? '';
