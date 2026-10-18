@@ -121,6 +121,34 @@ test.describe('home page', () => {
     expect(initial).toBe(scheme === 'dark' ? dark : light);
   });
 
+  test('renders the self-hosted IBM Plex fonts from this origin', async ({ page, baseURL }) => {
+    const fontRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.resourceType() === 'font') fontRequests.push(request.url());
+    });
+    await page.goto('/');
+    const loaded = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return [...document.fonts]
+        .filter((face) => face.status === 'loaded')
+        .map((face) => `${face.family} ${face.weight}`)
+        .sort();
+    });
+    // next/font/local names each family after its variable in apps/web/lib/fonts.ts.
+    expect(loaded).toEqual([
+      'plexMono 400',
+      'plexMono 500',
+      'plexSans 400',
+      'plexSans 500',
+      'plexSans 600',
+    ]);
+    expect(fontRequests.length).toBeGreaterThan(0);
+    for (const url of fontRequests) {
+      expect(new URL(url).origin).toBe(new URL(baseURL ?? '').origin);
+      expect(url).toMatch(/\/_next\/static\/media\/[^/]+\.woff2$/);
+    }
+  });
+
   test('registers the service worker', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'service workers are only exercised in Chromium');
     await page.goto('/');

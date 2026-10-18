@@ -3,7 +3,7 @@
  *
  * The Content-Security-Policy is built per request in `middleware.ts` because
  * it carries a nonce; the rest are static and set from `next.config.ts`.
- * No third-party origins are allowed: fonts are self-hosted by next/font and
+ * No third-party origins are allowed: fonts are committed and served by next/font/local, and
  * data comes from this app's own API routes.
  */
 

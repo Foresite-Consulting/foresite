@@ -1,23 +1,30 @@
-import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import type { ResolvedTheme } from '@foresite/ui/theme';
 
 /**
- * Web fonts are self-hosted by next/font at build time (no request to Google
- * at runtime). next/font needs each family named statically, so this registry
- * lists the families themes may ask for; `type.sans` / `type.mono` in the
- * theme pick from it. A family not listed here falls back to the system stack
- * named in the theme CSS, with a build-time warning.
+ * Web fonts are committed to the repo (`apps/web/app/fonts/`, latin subset,
+ * SIL OFL 1.1) and served from our own origin by next/font/local, so neither
+ * the build nor the browser contacts Google. next/font needs each family named
+ * statically, so this registry lists the families themes may ask for;
+ * `type.sans` / `type.mono` in the theme pick from it. A family not listed here
+ * falls back to the system stack named in the theme CSS, with a build-time
+ * warning.
  */
-const plexSans = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
+const plexSans = localFont({
+  src: [
+    { path: '../app/fonts/ibm-plex-sans-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: '../app/fonts/ibm-plex-sans-latin-500-normal.woff2', weight: '500', style: 'normal' },
+    { path: '../app/fonts/ibm-plex-sans-latin-600-normal.woff2', weight: '600', style: 'normal' },
+  ],
   display: 'swap',
   variable: '--font-loaded-sans',
 });
 
-const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
+const plexMono = localFont({
+  src: [
+    { path: '../app/fonts/ibm-plex-mono-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: '../app/fonts/ibm-plex-mono-latin-500-normal.woff2', weight: '500', style: 'normal' },
+  ],
   display: 'swap',
   variable: '--font-loaded-mono',
 });
