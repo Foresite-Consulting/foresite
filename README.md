@@ -66,6 +66,8 @@ The PostgreSQL tests run in-process with PGlite, so no database server is needed
 
 Playwright downloads its own Chromium with `npx playwright install chromium`. On a machine that already has one, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` instead.
 
+Playwright starts its own production server on the port in `PLAYWRIGHT_BASE_URL` (default `http://127.0.0.1:3000`). If something already listens there it stops with an error rather than testing someone else's server; pick a free port (e.g. `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3517`) or, to reuse a server you started yourself with the same `E2E_INGEST_SECRET`, set `PLAYWRIGHT_REUSE_SERVER=1`.
+
 ### Work with Claude Code
 
 1. Open the repo in Claude Code. `CLAUDE.md` and the agents load automatically.

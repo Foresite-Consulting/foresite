@@ -73,3 +73,18 @@ Plain-language notes first, then the technical detail. Dates as `18 Oct 2026`.
   - Training window: optional `training_end` column in the forecast log (`<= as_of`; blank for the baseline). The gate refuses hold-out forecasts with `training_end` on or after their target week's Monday; `evaluate --sign-off` requires it on every challenger row. `synthetic-challenger --training-end`.
   - Files: input size checked with `stat()` before reading; writes flush and `fsync` the temporary file before the rename and `fsync` the folder; forecast-log appends take an `fcntl.flock` advisory lock on `<log>.lock` (one writer per log until Postgres); `accuracy --out-dir` and `evaluate --alerts-out` are atomic and refuse to overwrite an input.
   - New boundary tests: trend window `as_of − 55` in, `as_of − 56` out; holiday tie-break inside 330-400 days; match fraction at 9 of 10, 10 of 11 and 7 of 8.
+
+### Review follow-ups (PR 3)
+
+For the client: a counter that is set up wrong can no longer lock out the other counters on the same mobile network, and the app no longer keeps the counters' SIM and network identifiers.
+
+- F1: two lines on one entry point are refused (`device:create` and 400 `duplicate_entry_point`) instead of one overwriting the other's counts.
+- F2: the failed-login throttle is keyed on client address and claimed device id, with a looser per-address backstop (`INGEST_AUTH_FAILURES_PER_ADDRESS_PER_MINUTE`, 100/min); a recently verified credential skips both.
+- F4: JSON nested deeper than 32 levels, or with strings `jsonb` cannot hold (`\u0000`, unpaired surrogates), gets 400 `invalid_json` instead of a 503.
+- F5: overlapping intervals are flagged with an `overlap_detected` event (still stored); intervals capped at 24 hours. Exclusion constraint vs join-time detection left to Lachlan (ADR 0003).
+- F6: the migration also revokes the identity sequences from `anon`/`authenticated`, and checks every `secret_hashes` element is a scrypt hash.
+- F7: a client abort mid-body gets 400 `body_aborted` (warn, with request id) instead of an unlogged `internal_error`.
+- F8: rotation SQL raises unless exactly one row is updated, touches `updated_at`, and `--rotate` warns that the secret is only valid if the SQL succeeded.
+- Data minimisation: Milesight `network_info`, `nodeDeviceInfo`, `device_mac`/`mac`, `ip_address` and SIM identifiers are stripped before the raw payload is stored; the key names go in the new `counter_raw_payloads.metadata`.
+- Playwright starts its own server on the port in `PLAYWRIGHT_BASE_URL` and only reuses one with `PLAYWRIGHT_REUSE_SERVER=1`.
+- Documented for Lachlan in ADR 0003 "Open decisions": a least-privilege ingest role (F3, with the grants), the overlap rule (F5), retention for raw payloads and events (privacy adviser).
