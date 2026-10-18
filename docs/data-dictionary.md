@@ -6,6 +6,8 @@ Implementation: `packages/core` (TypeScript). Golden test vectors that any other
 
 Each definition gives its formula, source fields, ex or inc GST, and the trading-day basis. Every fact is keyed by **trading day** (open to close in the venue's local time, not midnight to midnight) and **section**.
 
+It also covers every table and every field a connector maps. Times are `timestamptz` in UTC unless stated. Each section is self-contained.
+
 ## Conventions
 
 | Thing       | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -178,3 +180,86 @@ Computed per model × venue × metric over **scored** forecasts: the model gave 
 | Standing rollback | Once rolled back, a challenger id + version stays on the baseline in later checks (state file, `evaluate --state`) until a person passes the Phase 2 gate again (`--reinstate`) |
 | Alert id          | Hash of venue, metric, challenger id + version and the trigger week, so one rollback event keeps one id across re-runs and later weeks                                          |
 | Phase 2 gate      | On the hold-out weeks (default last 8): all evaluable, pooled WAPE strictly lower, and better in at least ⌈0.75 × weeks⌉ weeks (6 of 8)                                         |
+
+## Counter readings
+
+People counters push interval counts to `POST /api/ingest/counters/<provider>`. Migration: `db/migrations/0001_counter_ingest.sql`. Decisions: `docs/adr/0003-counter-ingest.md`. Trading days are **not** assigned here: join `interval_start`/`interval_end` to the trading-day model (venue timezone) downstream.
+
+Every table has `venue_id` (text, not null) for row-level security. RLS is enabled with no policies yet, so app users see nothing; read policies come with the auth PR.
+
+### `counter_devices`
+
+| Column                     | Type        | Notes                                                                                                                                 |
+| -------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `device_id`                | text PK     | Foresite device id, 3–64 of `A-Za-z0-9._-`. Also the HTTP Basic username.                                                             |
+| `provider`                 | text        | Adapter key, e.g. `milesight`.                                                                                                        |
+| `venue_id`                 | text        | Venue the device belongs to.                                                                                                          |
+| `entry_point_id`           | text        | Entry point (door, gate) for line 1.                                                                                                  |
+| `line_entry_points`        | jsonb       | Optional `{"<line>": "<entry point id>"}` for extra lines. Each line must land on its own entry point (else `duplicate_entry_point`). |
+| `vendor_serial`            | text, null  | When set, payloads must carry this serial (`device_info.device_sn` for Milesight).                                                    |
+| `active`                   | boolean     | `false` revokes the device at once.                                                                                                   |
+| `created_at`, `updated_at` | timestamptz | `updated_at` is also touched by secret rotation.                                                                                      |
+
+### `counter_device_credentials`
+
+| Column          | Type        | Notes                                                                                                                                                                                        |
+| --------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `device_id`     | text PK, FK | One row per device.                                                                                                                                                                          |
+| `venue_id`      | text        | Must equal the device's venue (composite FK).                                                                                                                                                |
+| `secret_hashes` | text[]      | One scrypt hash, or two during rotation. Never the secret. Never readable by app users. Each element must match the scrypt format `scrypt$v=1$n=…,r=…,p=…$<salt>$<hash>` (check constraint). |
+| `updated_at`    | timestamptz |                                                                                                                                                                                              |
+
+### `counter_raw_payloads` (staging)
+
+| Column                  | Type        | Notes                                                                                                                                                                            |
+| ----------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                    | bigint PK   |                                                                                                                                                                                  |
+| `venue_id`, `device_id` | text        | Authenticated device.                                                                                                                                                            |
+| `provider`              | text        |                                                                                                                                                                                  |
+| `payload_hash`          | text        | SHA-256 hex of the exact request body as received (before minimisation). Unique with `device_id`.                                                                                |
+| `payload`               | jsonb       | The body as received minus device and SIM identifiers (synthetic in tests). Kept so mapping fixes can be replayed.                                                               |
+| `received_at`           | timestamptz | When our endpoint received it.                                                                                                                                                   |
+| `parse_status`          | text        | `mapped` or `rejected`.                                                                                                                                                          |
+| `error_code`            | text, null  | Safe code when rejected (`invalid_payload`, `missing_interval`, `duplicate_entry_point`, `device_mismatch`, …).                                                                  |
+| `metadata`              | jsonb       | About the row, not from the payload. `{"stripped_keys": [...]}`: names of the keys removed by data minimisation (e.g. `network_info`, `device_mac`, `ip_address`). Never values. |
+
+Data minimisation: before storage the adapter removes keys counting does not need. Milesight: `network_info` (ICCID, IMEI, cell ID, LAC), `nodeDeviceInfo`, `device_mac`/`mac`, `ip_address`, and any ICCID/IMEI/IMSI/MSISDN/cell-id/LAC key anywhere (case and underscores ignored).
+
+### `counter_readings`
+
+Unique on `(device_id, entry_point_id, interval_start, interval_end)`.
+
+| Column                     | Type          | Source (Milesight)                               | Notes                                                                                |
+| -------------------------- | ------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `id`                       | bigint PK     |                                                  |                                                                                      |
+| `venue_id`                 | text          | device registration                              |                                                                                      |
+| `device_id`                | text          | HTTP Basic username                              |                                                                                      |
+| `entry_point_id`           | text          | registration + `line_periodic_data[].line`       | Line 1 → device entry point; other lines → mapping or `<entry>:line-<n>`.            |
+| `source_line`              | text          | `line_periodic_data[].line`                      | Vendor line number, for traceability.                                                |
+| `interval_start`           | timestamptz   | `time_info.start_time` (local with offset → UTC) |                                                                                      |
+| `interval_end`             | timestamptz   | `time_info.end_time` (local with offset → UTC)   | Always after `interval_start`; at most 24 h later.                                   |
+| `count_in`                 | integer       | `line_periodic_data[].in`                        | People crossing inwards during the interval. 0–100,000.                              |
+| `count_out`                | integer       | `line_periodic_data[].out`                       | People crossing outwards during the interval. 0–100,000.                             |
+| `occupancy`                | integer, null | `line_total_data[].capacity_counted`             | Device's current occupancy for the line. Meaning UNVERIFIED. Negative → null.        |
+| `device_reported_at`       | timestamptz   | `time_info.end_time`                             | Decides conflicts: later wins, tie → later arrival.                                  |
+| `received_at`              | timestamptz   | server clock                                     |                                                                                      |
+| `raw_payload_hash`         | text          | SHA-256 of the body                              | FK to `counter_raw_payloads (device_id, payload_hash)`.                              |
+| `clock_flag`               | text, null    | server                                           | `late` when the interval ended more than `INGEST_LATE_AFTER_MINUTES` before receipt. |
+| `revision`                 | integer       | server                                           | 1, +1 each time a conflicting re-send replaces the counts.                           |
+| `created_at`, `updated_at` | timestamptz   |                                                  |                                                                                      |
+
+Overlapping intervals at one entry point are stored as distinct rows and flagged with an `overlap_detected` event; do not sum them. How totals treat them is an open decision (ADR 0003).
+
+Not mapped to readings (kept in `counter_raw_payloads` only): `line_trigger_data` (would double count the periodic data), `region_data`, `region_trigger_data`, staff/children/group/cart counts, `device_info` other than `device_sn` and the identifiers removed by data minimisation. `network_info`, `device_mac` and `ip_address` are not stored at all.
+
+### `counter_ingest_events` (audit)
+
+| Column                  | Type        | Notes                                                                                                                               |
+| ----------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                    | bigint PK   |                                                                                                                                     |
+| `venue_id`, `device_id` | text        | Authenticated device only. Failed logins are logged, not stored.                                                                    |
+| `event_type`            | text        | `request`, `reading_conflict`, `reading_rejected_clock`, `device_alarm`, `payload_rejected`, `device_mismatch`, `overlap_detected`. |
+| `occurred_at`           | timestamptz | Receipt time.                                                                                                                       |
+| `detail`                | jsonb       | Fixed vocabulary, ids, timestamps and counts only. Never payload text or secrets.                                                   |
+
+`request` detail: `accepted`, `duplicate`, `conflict`, `rejected`, `late`, `ignored`, `raw_duplicate`, `secret_slot`, `report_types`, `payload_hash`. `reading_conflict` detail: key fields, `resolution` (`replaced` / `kept_existing`) and both versions' counts, device timestamps and payload hashes. `reading_rejected_clock` detail: `reason` (`future` / `too_old`) and the key fields. `device_alarm` detail: `alarm` (`occlusion`), `status` (`occluded` / `other`). `overlap_detected` detail: `entry_point_id`, `interval_start`, `interval_end` of the new reading and `overlapping_readings` (how many stored readings at that entry point it overlaps).

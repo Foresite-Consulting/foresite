@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
   poweredByHeader: false,
   // The design system is consumed from source.
-  transpilePackages: ['@foresite/ui'],
+  transpilePackages: ['@foresite/ui', '@foresite/connectors'],
   // Monorepo: trace files from the repo root and keep the theme folder in the
   // server bundle so the theme loader can read it at runtime on Vercel.
   outputFileTracingRoot: repoRoot,

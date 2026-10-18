@@ -1,0 +1,18 @@
+{
+  "_synthetic": "Synthetic, shaped from vendor docs (VS135 cellular, Communication Protocol > Trigger Report > Occlusion Detection Alarm). Not from any device or venue.",
+  "device_info": {
+    "device_name": "Test counter",
+    "device_sn": "TEST0000000001",
+    "running_time": 87749
+  },
+  "time_info": {
+    "dst_status": false,
+    "enable_dst": false,
+    "time": "2026-10-17T21:04:32+08:00",
+    "time_zone": "UTC+8:00 Australia/Perth"
+  },
+  "tof_occlusion_trigger": {
+    "device_sn": "TEST0000000001",
+    "occlusion_status": "occluded"
+  }
+}
