@@ -1,0 +1,30 @@
+{
+  "_synthetic": "Synthetic, shaped from vendor docs (VS135 cellular, Communication Protocol > Trigger Report > Line Crossing People Counting). Not from any device or venue.",
+  "device_info": {
+    "device_name": "Test counter",
+    "device_sn": "TEST0000000001",
+    "firmware_version": "V_135.1.0.9",
+    "running_time": 58
+  },
+  "line_trigger_data": [
+    {
+      "children_in": 0,
+      "children_out": 0,
+      "group_in": 0,
+      "group_out": 0,
+      "in": 1,
+      "line": 1,
+      "line_name": "Line1",
+      "line_uuid": "00000000-0000-0000-0000-000000000001",
+      "out": 0,
+      "staff_in": 0,
+      "staff_out": 0
+    }
+  ],
+  "time_info": {
+    "dst_status": false,
+    "enable_dst": false,
+    "time": "2026-10-17T19:03:11+08:00",
+    "time_zone": "UTC+8:00 Australia/Perth"
+  }
+}

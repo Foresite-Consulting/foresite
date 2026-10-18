@@ -1,0 +1,26 @@
+{
+  "_synthetic": "Synthetic, shaped from vendor docs (VS135 cellular, Communication Protocol > Trigger Report > Region People Counting). Not from any device or venue.",
+  "device_info": {
+    "device_name": "Test counter",
+    "device_sn": "TEST0000000001",
+    "running_time": 57982
+  },
+  "region_trigger_data": {
+    "region_count_data": [
+      {
+        "current_children": 0,
+        "current_staff": 0,
+        "current_total": 6,
+        "region": 1,
+        "region_name": "Region1",
+        "region_uuid": "00000000-0000-0000-0000-0000000000a1"
+      }
+    ]
+  },
+  "time_info": {
+    "dst_status": false,
+    "enable_dst": false,
+    "time": "2026-10-17T19:03:14+08:00",
+    "time_zone": "UTC+8:00 Australia/Perth"
+  }
+}
