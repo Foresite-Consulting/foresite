@@ -1,0 +1,18 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+forecast/.venv/
+forecast/uv.lock
+*.png
+*.ico
+*.pdf
+apps/web/next-env.d.ts
+# Existing agent, skill and template files keep their original formatting.
+.claude/
+CLAUDE.md
+docs/templates/

@@ -1,0 +1,48 @@
+[project]
+name = "foresite-forecast"
+version = "0.1.0"
+description = "Foresite forecast engine: LightGBM with a quantile range, weekly retrain, accuracy tracking and baseline rollback. Placeholder until the engine PR lands."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "UNLICENSED" }
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "mypy==1.18.2",
+  "pip-audit==2.9.0",
+  "pytest==9.0.3",
+  "ruff==0.14.4",
+]
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["foresite_forecast"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["foresite_forecast", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "PT", "ANN", "S"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+files = ["foresite_forecast", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"

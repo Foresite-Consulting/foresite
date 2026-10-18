@@ -1,0 +1,15 @@
+{
+  "name": "@foresite/connectors",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Connectors to client systems, one folder per vendor with a runbook. Placeholder until the first connector PR.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  }
+}

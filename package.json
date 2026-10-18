@@ -1,0 +1,52 @@
+{
+  "name": "foresite-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Foresite core: the reusable base every Foresite client build starts from.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "22.x",
+    "npm": ">=10 <12"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npm run test:e2e -w apps/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "theme:check": "tsx packages/ui/scripts/theme-check.ts",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.3",
+    "@next/eslint-plugin-next": "15.5.28",
+    "@types/node": "22.19.13",
+    "eslint": "9.39.3",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "6.1.1",
+    "globals": "16.4.0",
+    "jsdom": "26.1.0",
+    "prettier": "3.8.1",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.56.1",
+    "vite": "7.3.7",
+    "vitest": "4.1.11"
+  },
+  "overrides": {
+    "vite": "7.3.7",
+    "postcss": "8.5.30",
+    "sharp": "0.35.5",
+    "playwright-core": "1.56.1"
+  }
+}

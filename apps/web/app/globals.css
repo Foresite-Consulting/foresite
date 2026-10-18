@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-bg font-sans text-body text-text-primary antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply min-h-dvh bg-bg;
+  }
+
+  a {
+    @apply text-link underline decoration-1 underline-offset-4 hover:decoration-2;
+  }
+
+  /* Keyboard focus: a 2px outline in the link colour (Ember on light, Mist on
+   * dark), which theme:check requires to reach 3:1 on bg and surface. An
+   * outline, not a box-shadow ring, so it survives Windows forced colours. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--color-link));
+    outline-offset: 2px;
+  }
+}
