@@ -129,6 +129,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** True if `value` has no keys outside `allowed` (missing optional keys are fine). */
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
 function isShortString(value: unknown): value is string {
   return typeof value === 'string' && value.length <= SNAPSHOT_LIMITS.maxStringLength;
 }
@@ -140,6 +145,7 @@ function isOptional(value: unknown, check: (v: unknown) => boolean): boolean {
 function isChange(value: unknown): value is KpiChange {
   return (
     isRecord(value) &&
+    hasOnlyKeys(value, ['direction', 'amount', 'comparison', 'sentiment']) &&
     (value.direction === 'up' || value.direction === 'down' || value.direction === 'flat') &&
     isShortString(value.amount) &&
     isShortString(value.comparison) &&
@@ -151,12 +157,18 @@ function isChange(value: unknown): value is KpiChange {
 }
 
 function isForecastRange(value: unknown): value is KpiForecastRange {
-  return isRecord(value) && isShortString(value.low) && isShortString(value.high);
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['low', 'high']) &&
+    isShortString(value.low) &&
+    isShortString(value.high)
+  );
 }
 
 function isTile(value: unknown): value is KpiSnapshotTile {
   return (
     isRecord(value) &&
+    hasOnlyKeys(value, ['id', 'label', 'value', 'change', 'forecastRange']) &&
     isShortString(value.id) &&
     isShortString(value.label) &&
     isShortString(value.value) &&
@@ -177,12 +189,14 @@ function isTimeZone(value: unknown): value is string {
 
 /**
  * Shape check for a snapshot read back from browser storage. Anything on the
- * device can be edited, so this is strict: known fields only, valid date and
- * timezone, at most 24 tiles and 200 characters per string.
+ * device can be edited, so this is strict: known fields only (an unknown key at
+ * any level rejects the whole snapshot), valid date and timezone, at most 24
+ * tiles and 200 characters per string.
  */
 export function isKpiSnapshot(value: unknown): value is KpiSnapshot {
   return (
     isRecord(value) &&
+    hasOnlyKeys(value, ['updatedAt', 'timeZone', 'source', 'tiles']) &&
     isShortString(value.updatedAt) &&
     !Number.isNaN(Date.parse(value.updatedAt)) &&
     isTimeZone(value.timeZone) &&

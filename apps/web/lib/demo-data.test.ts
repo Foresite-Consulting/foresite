@@ -89,4 +89,28 @@ describe('isKpiSnapshot', () => {
     expect(isKpiSnapshot({ ...base(), tiles: {} })).toBe(false);
     expect(isKpiSnapshot([])).toBe(false);
   });
+
+  it('rejects unknown keys at every level', () => {
+    const change = {
+      direction: 'up',
+      amount: '1%',
+      comparison: 'vs budget',
+      sentiment: 'positive',
+    };
+    const forecastRange = { low: '$1', high: '$2' };
+    const full = { ...tile, change, forecastRange };
+    expect(isKpiSnapshot({ ...base(), tiles: [full] })).toBe(true);
+    for (const bad of [
+      { ...base(), extra: true },
+      { ...base(), tiles: [{ ...full, extra: true }] },
+      { ...base(), tiles: [{ ...full, change: { ...change, extra: true } }] },
+      { ...base(), tiles: [{ ...full, forecastRange: { ...forecastRange, extra: true } }] },
+      // An inherited-looking key set as own data is still unknown.
+      JSON.parse(
+        `{"updatedAt":"2026-10-18T00:00:00Z","timeZone":"UTC","source":"demo","tiles":[],"__proto__":{"x":1}}`,
+      ) as unknown,
+    ]) {
+      expect(isKpiSnapshot(bad)).toBe(false);
+    }
+  });
 });
