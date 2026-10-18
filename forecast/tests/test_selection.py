@@ -139,6 +139,35 @@ def test_challenger_must_cover_most_of_the_baselines_forecasts() -> None:
     assert "covered 5 of the baseline's 7" in d.weeks[0].note
 
 
+@pytest.mark.parametrize(
+    ("baseline_n", "challenger_n", "evaluable"),
+    [
+        (10, 9, True),  # exactly 90%: enough
+        (11, 10, True),  # 90.9%
+        (8, 7, False),  # 87.5%: not enough
+    ],
+)
+def test_match_fraction_threshold(baseline_n: int, challenger_n: int, evaluable: bool) -> None:
+    actuals = build_actuals(FIRST_MONDAY, [1000] * 7)
+    # One forecast a day at horizon 1, then extra horizon-2 forecasts to reach baseline_n.
+    slots = [(d, 1) for d in range(7)] + [(d, 2) for d in range(baseline_n - 7)]
+    target = [(FIRST_MONDAY + timedelta(days=d), h) for d, h in slots]
+    baseline = [
+        make_forecast(t, 1100, horizon=h, model_id="baseline-swly-trend") for t, h in target
+    ]
+    challenger = [make_forecast(t, 1050, horizon=h) for t, h in target[:challenger_n]]
+    (d,) = decide_rollback(
+        forecasts_to_frame(challenger),
+        forecasts_to_frame(baseline),
+        actuals,
+        config=SelectionConfig(rollback_weeks=1),
+    )
+    (w,) = d.weeks
+    assert (w.pairs, w.baseline_scored) == (challenger_n, baseline_n)
+    assert (w.verdict != "insufficient") is evaluable
+    assert d.decision == ("keep" if evaluable else "insufficient_data")
+
+
 def test_worse_margin() -> None:
     modes: list[Mode] = ["worse"] * 4
     slightly = {"worse": 1110}  # 11% vs 10% WAPE

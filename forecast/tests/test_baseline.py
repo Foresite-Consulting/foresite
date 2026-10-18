@@ -328,6 +328,59 @@ def test_baseline_implements_the_model_interface() -> None:
     assert isinstance(BaselineModel(), ForecastModel)
 
 
+def flat_engine(value: Callable[[date], Value], calendar: VenueCalendar | None = None) -> Any:
+    actuals = two_years(value)
+    return SeriesBaseline(
+        actuals.series(VENUE, SECTION, METRIC), calendar or VenueCalendar.empty(), BaselineConfig()
+    )
+
+
+def test_trend_window_is_as_of_minus_55_to_as_of() -> None:
+    as_of = date(2025, 6, 30)
+
+    def spike_on(day: date) -> Callable[[date], Value]:
+        return lambda d: 66_000 if d == day else 10_000
+
+    inside = flat_engine(spike_on(as_of - timedelta(days=55))).trend(as_of)
+    assert inside.pairs == 56
+    assert inside.factor == pytest.approx(616_000 / 560_000)  # the spike counts
+    outside = flat_engine(spike_on(as_of - timedelta(days=56))).trend(as_of)
+    assert outside.pairs == 56
+    assert outside.factor == 1.0  # one day earlier: outside the window
+    gap_inside = flat_engine(lambda d: None if d == as_of - timedelta(days=55) else 10_000)
+    assert gap_inside.trend(as_of).pairs == 55
+    gap_outside = flat_engine(lambda d: None if d == as_of - timedelta(days=56) else 10_000)
+    assert gap_outside.trend(as_of).pairs == 56
+
+
+@pytest.mark.parametrize(
+    ("offsets", "expected"),
+    [
+        ((357, 371), 371),  # both 7 days from 364: the earlier date wins the tie
+        ((371, 357), 371),  # whatever order the calendar lists them in
+        ((360, 370), 360),  # otherwise the nearer to 364 wins
+        ((330, 400), 330),  # both ends of the window are inside it; 330 is nearer
+        ((329, 401), None),  # just outside the window: no holiday match
+    ],
+)
+def test_holiday_candidate_tie_break(offsets: tuple[int, int], expected: int | None) -> None:
+    target = date(2025, 7, 1)
+    days = [target - timedelta(days=o) for o in offsets]
+    values = {days[0]: 20_000, days[1]: 30_000}
+    calendar = cal({target: "festival", days[0]: "festival", days[1]: "festival"})
+    engine = flat_engine(lambda d: values.get(d, 10_000), calendar)
+    est = engine.point(target - timedelta(days=1), 1)
+    if expected is None:
+        assert est.rule != RULE_HOLIDAY
+        return
+    chosen = target - timedelta(days=expected)
+    assert est.rule == RULE_HOLIDAY
+    assert est.reference_days == (chosen,)
+    assert est.trend is not None
+    assert est.trend.factor == 1.0
+    assert est.value == pytest.approx(values[chosen])
+
+
 def test_round_half_up() -> None:
     assert [_round_half_up(x) for x in (0.5, 1.5, 2.4999, 2.5)] == [1, 2, 2, 3]
 
