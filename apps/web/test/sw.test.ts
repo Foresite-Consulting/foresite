@@ -26,8 +26,18 @@ class FakeCache {
     const key = typeof request === 'string' ? new URL(request, ORIGIN).href : request.url;
     this.store.set(key, response);
   }
+  async delete(request: Request | string) {
+    const key = typeof request === 'string' ? new URL(request, ORIGIN).href : request.url;
+    return this.store.delete(key);
+  }
   async keys() {
     return [...this.store.keys()].map((url) => new Request(url));
+  }
+  paths() {
+    return [...this.store.keys()].map((url) => {
+      const parsed = new URL(url);
+      return parsed.pathname + parsed.search;
+    });
   }
 }
 
@@ -108,9 +118,21 @@ function navigate(path: string): Request {
   }) as Request;
 }
 
-function html(body: string) {
-  return new Response(body, { status: 200, headers: { 'Content-Type': 'text/html' } });
+/** A Response as fetch would return it, with its final URL set (Node's constructor cannot). */
+function fetched(response: Response, url: string, redirected = false): Response {
+  Object.defineProperty(response, 'url', { value: new URL(url, ORIGIN).href });
+  Object.defineProperty(response, 'redirected', { value: redirected });
+  return response;
 }
+
+function html(body: string, url: string, status = 200) {
+  return fetched(
+    new Response(body, { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } }),
+    url,
+  );
+}
+
+const CACHE = 'foresite-v2';
 
 describe('service worker', () => {
   let sw: ReturnType<typeof load>;
@@ -119,16 +141,17 @@ describe('service worker', () => {
     sw = load();
     sw.fetchMock.mockImplementation(async (input) => {
       const url = new URL(typeof input === 'string' ? input : input.url, ORIGIN);
-      if (url.pathname === '/offline') return html(offlineHtml);
-      if (url.pathname.startsWith('/_next/static/')) return new Response('asset');
-      if (url.pathname === '/api/health') return Response.json({ status: 'ok' });
-      return html('<html>page</html>');
+      if (url.pathname === '/offline') return html(offlineHtml, url.href);
+      if (url.pathname.startsWith('/_next/static/'))
+        return fetched(new Response('asset'), url.href);
+      if (url.pathname === '/api/health') return fetched(Response.json({ status: 'ok' }), url.href);
+      return html('<html>page</html>', url.href);
     });
   });
 
   it('precaches the offline page and the chunks it references on install', async () => {
     await sw.dispatch('install');
-    const cache = sw.caches.get('foresite-v1');
+    const cache = sw.caches.get(CACHE);
     expect(cache).toBeDefined();
     const keys = (await cache!.keys()).map((r) => new URL(r.url).pathname);
     expect(keys).toEqual(
@@ -143,6 +166,7 @@ describe('service worker', () => {
 
   it('removes old caches on activate', async () => {
     await sw.cacheStorage.open('foresite-v0');
+    await sw.cacheStorage.open('foresite-v1');
     await sw.cacheStorage.open('other-app');
     await sw.dispatch('activate');
     expect(await sw.cacheStorage.keys()).toEqual(['other-app']);
@@ -154,7 +178,7 @@ describe('service worker', () => {
     const request = navigate('/');
     const response = await sw.dispatch('fetch', request);
     expect(await response!.text()).toBe('<html>page</html>');
-    const keys = (await sw.caches.get('foresite-v1')!.keys()).map((r) => new URL(r.url).pathname);
+    const keys = (await sw.caches.get(CACHE)!.keys()).map((r) => new URL(r.url).pathname);
     expect(keys).not.toContain('/');
   });
 
@@ -191,5 +215,120 @@ describe('service worker', () => {
     const again = await sw.dispatch('fetch', new Request(`${ORIGIN}/_next/static/chunks/a.js`));
     expect(await again!.text()).toBe('asset');
     expect(sw.fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a non-OK page response as it is, not the offline page', async () => {
+    await sw.dispatch('install');
+    sw.fetchMock.mockResolvedValue(html('<html>server error</html>', `${ORIGIN}/`, 500));
+    const response = await sw.dispatch('fetch', navigate('/'));
+    expect(response!.status).toBe(500);
+    expect(await response!.text()).toBe('<html>server error</html>');
+  });
+
+  it('lets a failed static fetch fail as it would without a worker, and caches nothing', async () => {
+    sw.fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const url = `${ORIGIN}/_next/static/chunks/b.js`;
+    await expect(sw.dispatch('fetch', new Request(url))).rejects.toThrow('Failed to fetch');
+    expect(await sw.cacheStorage.match(url)).toBeUndefined();
+    // The next attempt, online, is fetched and cached as usual.
+    expect(await (await sw.dispatch('fetch', new Request(url)))!.text()).toBe('asset');
+  });
+
+  it('does not store /offline when it redirects somewhere else', async () => {
+    sw.fetchMock.mockImplementation(async (input) => {
+      const url = new URL(typeof input === 'string' ? input : input.url, ORIGIN);
+      if (url.pathname === '/offline') {
+        // e.g. a future auth layer bouncing /offline to sign-in.
+        return fetched(
+          new Response('<html>Sign in, Jane</html>', {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          }),
+          `${ORIGIN}/sign-in?next=/offline`,
+          true,
+        );
+      }
+      return fetched(new Response('asset'), url.href);
+    });
+    await expect(sw.dispatch('install')).rejects.toThrow(/Offline page not stored/);
+    expect(await sw.cacheStorage.match('/offline')).toBeUndefined();
+    expect(sw.self.skipWaiting).not.toHaveBeenCalled();
+  });
+
+  it('does not store /offline unless it is a 200 HTML document', async () => {
+    for (const response of [
+      html('<html>oops</html>', '/offline', 500),
+      fetched(Response.json({ not: 'html' }), '/offline'),
+    ]) {
+      const fresh = load();
+      fresh.fetchMock.mockResolvedValue(response);
+      await expect(fresh.dispatch('install')).rejects.toThrow(/Offline page not stored/);
+      expect(await fresh.cacheStorage.match('/offline')).toBeUndefined();
+    }
+  });
+
+  it("drops the old build's static files when the offline page changes", async () => {
+    await sw.dispatch('install');
+    const cache = sw.caches.get(CACHE)!;
+    // A chunk from the previous build, cached while browsing.
+    await cache.put('/_next/static/chunks/old-build-123.js', new Response('old'));
+    expect(cache.paths()).toContain('/_next/static/chunks/old-build-123.js');
+
+    // New deploy: the offline page now references a new chunk.
+    const newHtml = '<html><script src="/_next/static/chunks/offline-def.js"></script></html>';
+    sw.fetchMock.mockImplementation(async (input) => {
+      const url = new URL(typeof input === 'string' ? input : input.url, ORIGIN);
+      if (url.pathname === '/offline') return html(newHtml, url.href);
+      if (url.pathname.startsWith('/_next/static/'))
+        return fetched(new Response('asset'), url.href);
+      return html('<html>page</html>', url.href);
+    });
+    // The first successful navigation refreshes the offline page.
+    await sw.dispatch('fetch', navigate('/'));
+    await vi.waitFor(() => {
+      expect(cache.paths()).toContain('/_next/static/chunks/offline-def.js');
+      expect(cache.paths()).not.toContain('/_next/static/chunks/old-build-123.js');
+    });
+    expect(cache.paths()).not.toContain('/_next/static/chunks/offline-abc.js');
+    expect(cache.paths()).toContain('/offline');
+  });
+
+  it('keeps runtime-cached chunks while the build is unchanged', async () => {
+    await sw.dispatch('install');
+    await sw.dispatch('fetch', new Request(`${ORIGIN}/_next/static/chunks/page-a.js`));
+    const cache = sw.caches.get(CACHE)!;
+    await vi.waitFor(() => {
+      expect(cache.paths()).toContain('/_next/static/chunks/page-a.js');
+    });
+    // Same offline page again (worker restarted, first navigation): nothing dropped.
+    await sw.dispatch('fetch', navigate('/'));
+    const offlineFetches = () =>
+      sw.fetchMock.mock.calls.filter(([input]) => input === '/offline').length;
+    await vi.waitFor(() => {
+      expect(offlineFetches()).toBe(2);
+    });
+    // Let the background refresh (put, record, prune) run to completion.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(cache.paths()).toContain('/_next/static/chunks/page-a.js');
+    expect(cache.paths()).toContain('/_next/static/chunks/offline-abc.js');
+  });
+
+  it('caps the static cache at 60 entries, oldest first, never evicting offline assets', async () => {
+    await sw.dispatch('install');
+    const cache = sw.caches.get(CACHE)!;
+    for (let i = 0; i < 70; i += 1) {
+      await sw.dispatch('fetch', new Request(`${ORIGIN}/_next/static/chunks/c${i}.js`));
+      // Let each fire-and-forget put + prune finish before the next request.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    await vi.waitFor(() => {
+      const statics = cache.paths().filter((p) => p.startsWith('/_next/static/'));
+      expect(statics).toHaveLength(60);
+    });
+    const statics = cache.paths().filter((p) => p.startsWith('/_next/static/'));
+    expect(statics).toContain('/_next/static/chunks/offline-abc.js');
+    expect(statics).toContain('/_next/static/css/app-1.css');
+    expect(statics).not.toContain('/_next/static/chunks/c0.js');
+    expect(statics).toContain('/_next/static/chunks/c69.js');
   });
 });

@@ -276,7 +276,7 @@ test.describe('service worker caching rules', () => {
       return { names, entries };
     });
 
-    expect(cached.names).toEqual(['foresite-v1']);
+    expect(cached.names).toEqual(['foresite-v2']);
     expect(cached.entries).toContain('/offline');
     expect(cached.entries.some((path) => path.startsWith('/_next/static/'))).toBe(true);
     expect(cached.entries.filter((path) => path.startsWith('/api/'))).toEqual([]);

@@ -6,15 +6,17 @@ The app installs from `/manifest.webmanifest`, which `apps/web/app/manifest.ts` 
 
 `apps/web/public/sw.js` is registered in production builds only (`components/RegisterServiceWorker.tsx`).
 
-| Request                              | Rule                                                                                                                            |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `/offline` and the chunks it needs   | Precached at install. Refreshed once per worker lifetime after the first successful page load, so a deploy brings a fresh copy. |
-| `/_next/static/*`                    | Cache-first. These files are content-hashed and immutable.                                                                      |
-| Page navigations (`/`, `/offline` …) | Network-first, never stored. If the network fails, the cached `/offline` page is served.                                        |
-| `/api/*`, `/auth*`                   | Never touched by the worker. No caching of data or auth responses.                                                              |
-| Non-GET, cross-origin                | Never touched by the worker.                                                                                                    |
+| Request                              | Rule                                                                                                                                                                                                                                                          |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/offline` and the chunks it needs   | Precached at install. Refreshed once per worker lifetime after the first successful page load, so a deploy brings a fresh copy. Stored only if the response is a 200 HTML document whose final URL is exactly `/offline` (a redirect target is never stored). |
+| `/_next/static/*`                    | Cache-first. These files are content-hashed and immutable. When the offline page's asset list changes (a new build), every other static entry is dropped; at most 60 static entries are kept at any time, oldest out first, never the offline page's own.     |
+| Page navigations (`/`, `/offline` …) | Network-first, never stored, returned as they come (a 500 stays a 500). Only if the network fails is the cached `/offline` page served.                                                                                                                       |
+| `/api/*`, `/auth*`                   | Never touched by the worker. No caching of data or auth responses.                                                                                                                                                                                            |
+| Non-GET, cross-origin                | Never touched by the worker.                                                                                                                                                                                                                                  |
 
-Caches are named `foresite-<version>`; bump `CACHE_VERSION` in `sw.js` when the rules change and old caches are deleted on activate. `/sw.js` is served with `Cache-Control: no-cache` so browsers pick up a new worker on the next visit.
+**`/offline` must stay public and free of personal data.** The worker stores its HTML for every visitor of the device, so it must never require sign-in, never vary by user and never put a person's details or the venue's trading figures in its HTML (the theme's app name and logo are fine). Its numbers come only from the device's own snapshot, read in the browser (below). If an auth layer ever redirects `/offline`, the worker refuses to store it rather than caching the sign-in page.
+
+Caches are named `foresite-<version>` (now `v2`); bump `CACHE_VERSION` in `sw.js` when the rules change and old caches are deleted on activate. `/sw.js` is served with `Cache-Control: no-cache` so browsers pick up a new worker on the next visit.
 
 ## "Showing the last numbers we had"
 
