@@ -1,6 +1,7 @@
 ---
 name: ui-ux-designer
 description: Use for screen flows, layouts, dashboard and chart design, the Foresite design system in packages/ui, and setting up a client's theme. Works in code (React + Tailwind tokens), not in pictures. Human lead is Joel Keeble (CPO).
+model: opus
 tools: Read, Grep, Glob, Write, Edit, Bash, WebFetch
 ---
 

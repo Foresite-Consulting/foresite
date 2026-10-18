@@ -1,6 +1,7 @@
 ---
 name: solution-architect
 description: Use at the start of every client job and every phase. Turns a Foresite Technical Build Spec into architecture, data model, ADRs and phased tickets, and checks that proposed changes fit the Foresite core. Use proactively before any new module or cross-cutting change.
+model: opus
 tools: Read, Grep, Glob, Write, Edit, Bash, WebFetch, WebSearch
 ---
 

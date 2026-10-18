@@ -62,6 +62,11 @@ Foresite is a services brand. Every client app looks like the **client's** app.
 | `security-privacy` | Auth, secrets, data handling, account ownership, dependency risk. A gate on every PR. |
 | `docs-handover` | README, data dictionary, runbooks, training notes, the handover and IP transfer pack |
 
+## Models
+- Building agents draft on **Claude Opus 5.5** (`model: opus`). `qa-test` and `security-privacy` review on **Claude Fable 5.1** (`model: fable`).
+- Reviewers report; they don't fix. The owning agent fixes from the findings on Opus, then the reviewer re-checks only what it flagged.
+- If Fable is unavailable or out of usage, carry on with Opus. Don't stop. Record in the PR which model reviewed it.
+
 ## Workflows (skills in `.claude/skills/`)
 - `new-client`: start a client build from this template.
 - `add-connector`: add a vendor connector the standard way.

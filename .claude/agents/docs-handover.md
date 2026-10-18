@@ -1,6 +1,7 @@
 ---
 name: docs-handover
 description: Use to keep README, architecture, data dictionary, runbooks and user guides current, and to prepare milestone release notes and the final handover and IP transfer pack for a client build.
+model: opus
 tools: Read, Grep, Glob, Write, Edit, Bash
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: data-forecasting-engineer
 description: Use for the trading-day and section data model, KPI calculations (GP, labour %, spend per head, vs budget, vs last year), budget upload, and the Python forecast engine with its accuracy tracking and rollback.
+model: opus
 tools: Read, Grep, Glob, Write, Edit, Bash, WebFetch, WebSearch
 ---
 
