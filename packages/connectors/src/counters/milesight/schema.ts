@@ -12,7 +12,8 @@ import { z } from 'zod';
  *
  * Policy: strict on the fields we use (types, ranges, presence), lenient on
  * everything else. Unknown keys are accepted and dropped from the parsed value
- * (the raw body is kept separately in the staging table), so a firmware update
+ * (the raw body, minus network and SIM identifiers, is kept separately in the
+ * staging table), so a firmware update
  * that adds fields does not break ingest.
  *
  * The documented examples are not valid JSON as printed (trailing commas,
@@ -36,8 +37,9 @@ const shortString = (max: number) => z.string().min(1).max(max);
 export const deviceInfoSchema = z.object({
   /** Device serial number. The only device_info field we rely on. */
   device_sn: shortString(64),
-  // Documented but unused: device_name, device_mac, ip_address, cus_device_id,
-  // cus_site_id, running_time, firmware_version, hardware_version.
+  // Documented but unused: device_name, cus_device_id, cus_site_id,
+  // running_time, firmware_version, hardware_version. device_mac and
+  // ip_address are removed before storage (see minimise.ts).
 });
 
 export const timeInfoSchema = z.object({

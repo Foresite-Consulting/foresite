@@ -220,6 +220,34 @@ describe('POST /api/ingest/counters/[provider]: happy path', () => {
     ]);
   });
 
+  it('strips device and SIM identifiers before the raw payload is stored, rejected or not', async () => {
+    const base = milesightPeriodic({ start: intervalStart(0) });
+    const withIds = {
+      ...base,
+      device_info: {
+        ...(base.device_info as Record<string, unknown>),
+        device_mac: '00:00:5E:00:53:01',
+        ip_address: '192.0.2.10',
+      },
+      network_info: { iccid: 'TEST-ICCID', imei: 'TEST-IMEI', cell_id: '0', lac: '0' },
+    };
+    expect((await post(s, { body: withIds })).status).toBe(201);
+    // Rejected payloads are stored too, so they get the same treatment.
+    const bad = { ...withIds, time_info: { end_time: 'x' } };
+    expect((await post(s, { body: bad })).status).toBe(400);
+    const raws = await s.repo.listRawPayloads('door-01');
+    expect(raws.map((r) => r.parseStatus)).toEqual(['mapped', 'rejected']);
+    for (const raw of raws) {
+      const text = JSON.stringify(raw.payload);
+      for (const value of ['TEST-ICCID', 'TEST-IMEI', '00:00:5E:00:53:01', '192.0.2.10']) {
+        expect(text).not.toContain(value);
+      }
+      expect(text).not.toContain('network_info');
+      expect(text).toContain('TEST0000000001');
+      expect(raw.strippedKeys).toEqual(['device_mac', 'ip_address', 'network_info']);
+    }
+  });
+
   it('accepts trigger reports without turning them into readings', async () => {
     const response = await post(s, {
       body: {
@@ -532,6 +560,7 @@ describe('refusals', () => {
       recordEvent: () => Promise.reject(new Error('connection reset')),
       listReadings: () => Promise.resolve([]),
       listEvents: () => Promise.resolve([]),
+      listRawPayloads: () => Promise.resolve([]),
     };
     failing.deps.repository = broken;
     const failed = await post(failing);

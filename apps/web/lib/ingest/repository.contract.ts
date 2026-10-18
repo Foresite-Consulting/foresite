@@ -73,6 +73,7 @@ export function batch(
       receivedAt: readings[0]?.receivedAt ?? new Date(BASE).toISOString(),
       parseStatus: 'mapped',
       errorCode: null,
+      strippedKeys: [],
     },
     readings: readings.map((r) => ({ ...r, rawPayloadHash: hash })),
     events,
@@ -260,6 +261,23 @@ export function describeRepositoryContract(
       // The same body stored again later is not a second raw row.
       const later = await repo.ingest(batch(h(5), [reading(0, { in: 1, out: 1 })]));
       expect(later.rawStored).toBe(false);
+    });
+
+    it('keeps the payload and the names of stripped keys with the raw row', async () => {
+      const b = batch(h(7), []);
+      await repo.ingest({ ...b, raw: { ...b.raw, strippedKeys: ['device_mac', 'network_info'] } });
+      await repo.ingest(batch(h(8), []));
+      const raws = await repo.listRawPayloads('contract-dev');
+      expect(raws).toEqual([
+        {
+          payloadHash: h(7),
+          payload: { synthetic: true, hash: h(7) },
+          parseStatus: 'mapped',
+          errorCode: null,
+          strippedKeys: ['device_mac', 'network_info'],
+        },
+        expect.objectContaining({ payloadHash: h(8), strippedKeys: [] }),
+      ]);
     });
 
     it('writes the request summary in the same batch', async () => {

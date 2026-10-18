@@ -9,6 +9,7 @@ import {
   type RawPayloadToStore,
   type ReadingFlag,
   type ReadingOutcome,
+  type StoredRawPayload,
   type StoredReading,
 } from './repository';
 
@@ -120,8 +121,10 @@ async function insertEvent(tx: SqlExecutor, event: IngestEventToStore): Promise<
 async function insertRaw(tx: SqlExecutor, raw: RawPayloadToStore): Promise<boolean> {
   const rows = await tx.query<{ id: unknown }>(
     `insert into counter_raw_payloads
-       (venue_id, device_id, provider, payload_hash, payload, received_at, parse_status, error_code)
-     values ($1::text, $2::text, $3::text, $4::text, $5::text::jsonb, $6::timestamptz, $7::text, $8::text)
+       (venue_id, device_id, provider, payload_hash, payload, received_at, parse_status, error_code,
+        metadata)
+     values ($1::text, $2::text, $3::text, $4::text, $5::text::jsonb, $6::timestamptz, $7::text, $8::text,
+             $9::text::jsonb)
      on conflict (device_id, payload_hash) do nothing
      returning id`,
     [
@@ -133,6 +136,7 @@ async function insertRaw(tx: SqlExecutor, raw: RawPayloadToStore): Promise<boole
       raw.receivedAt,
       raw.parseStatus,
       raw.errorCode,
+      JSON.stringify({ stripped_keys: raw.strippedKeys }),
     ],
   );
   return rows.length > 0;
@@ -278,6 +282,33 @@ export class PostgresIngestRepository implements IngestRepository {
       [deviceId],
     );
     return rows.map(toStoredReading);
+  }
+
+  async listRawPayloads(deviceId: string): Promise<StoredRawPayload[]> {
+    const rows = await this.db.query<{
+      payload_hash: string;
+      payload: string;
+      parse_status: StoredRawPayload['parseStatus'];
+      error_code: string | null;
+      metadata: string;
+    }>(
+      `select payload_hash, payload::text as payload, parse_status, error_code,
+              metadata::text as metadata
+         from counter_raw_payloads where device_id = $1::text order by id`,
+      [deviceId],
+    );
+    return rows.map((row) => {
+      const metadata = JSON.parse(row.metadata) as { stripped_keys?: unknown };
+      return {
+        payloadHash: row.payload_hash,
+        payload: JSON.parse(row.payload) as unknown,
+        parseStatus: row.parse_status,
+        errorCode: row.error_code,
+        strippedKeys: Array.isArray(metadata.stripped_keys)
+          ? metadata.stripped_keys.filter((k): k is string => typeof k === 'string')
+          : [],
+      };
+    });
   }
 
   async listEvents(deviceId: string): Promise<IngestEventToStore[]> {

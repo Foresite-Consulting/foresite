@@ -9,6 +9,7 @@ import {
   type CounterReading,
   type CounterReportType,
 } from '../types';
+import { minimiseMilesightPayload } from './minimise';
 import { MAX_REPORTS_PER_REQUEST, milesightReportSchema, type MilesightReport } from './schema';
 
 export const MILESIGHT_PROVIDER = 'milesight';
@@ -174,5 +175,6 @@ export function mapMilesightPayload(input: CounterMapInput): CounterMapOutcome {
 
 export const milesightAdapter: CounterAdapter = {
   provider: MILESIGHT_PROVIDER,
+  minimise: minimiseMilesightPayload,
   map: mapMilesightPayload,
 };

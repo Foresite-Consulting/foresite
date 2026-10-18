@@ -27,8 +27,14 @@ export interface RawPayloadToStore {
   deviceId: string;
   provider: string;
   payloadHash: string;
-  /** The parsed JSON body. Stored as jsonb so a mapping bug can be replayed. */
+  /**
+   * The parsed JSON body after data minimisation (the adapter's `minimise`
+   * removes device and SIM identifiers). Stored as jsonb so a mapping bug can
+   * be replayed.
+   */
   payload: unknown;
+  /** Names of the keys minimisation removed (stored in the row's metadata). Never values. */
+  strippedKeys: string[];
   receivedAt: string;
   parseStatus: RawParseStatus;
   /** Safe error code when `parseStatus` is `rejected`. */
@@ -74,6 +80,15 @@ export interface IngestBatchResult {
   outcomes: ReadingOutcome[];
 }
 
+/** A stored raw payload, as read back for tests and operators. */
+export interface StoredRawPayload {
+  payloadHash: string;
+  payload: unknown;
+  parseStatus: RawParseStatus;
+  errorCode: string | null;
+  strippedKeys: string[];
+}
+
 /** A stored reading, as read back for tests and the dedupe rule. */
 export interface StoredReading {
   deviceId: string;
@@ -105,6 +120,8 @@ export interface IngestRepository {
   listReadings(deviceId: string): Promise<StoredReading[]>;
   /** Read back, oldest first. For tests and operators. */
   listEvents(deviceId: string): Promise<IngestEventToStore[]>;
+  /** Read back, oldest first. For tests and operators. */
+  listRawPayloads(deviceId: string): Promise<StoredRawPayload[]>;
 }
 
 /** The natural key a reading is deduplicated on. */

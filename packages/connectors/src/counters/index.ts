@@ -10,6 +10,7 @@ import type { CounterAdapter } from './types';
 export * from './types';
 export { parseOffsetTimestamp, toUtcIso } from './timestamps';
 export { MILESIGHT_PROVIDER, mapMilesightPayload, milesightAdapter } from './milesight/map';
+export { minimiseMilesightPayload } from './milesight/minimise';
 
 const adapters: ReadonlyMap<string, CounterAdapter> = new Map([
   [milesightAdapter.provider, milesightAdapter],

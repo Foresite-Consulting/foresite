@@ -197,6 +197,10 @@ export async function handleCounterIngest(
   if (unsafe !== null)
     return fail(400, 'invalid_json', { ...who, outcome: `invalid_json_${unsafe}` });
 
+  // Data minimisation: device and SIM identifiers never reach storage or the mapper.
+  const minimised = adapter.minimise?.(parsed) ?? { payload: parsed, strippedKeys: [] };
+  const payload = minimised.payload;
+
   const receivedAtMs = deps.now();
   const receivedAt = new Date(receivedAtMs).toISOString();
   const payloadHash = hashPayload(body.bytes);
@@ -205,7 +209,8 @@ export async function handleCounterIngest(
     deviceId: device.deviceId,
     provider: adapter.provider,
     payloadHash,
-    payload: parsed,
+    payload,
+    strippedKeys: minimised.strippedKeys,
     receivedAt,
     parseStatus,
     errorCode,
@@ -222,7 +227,7 @@ export async function handleCounterIngest(
   });
 
   // A throw from the adapter is a bug, not bad data: it surfaces as a 500 from the route.
-  const mapped = adapter.map({ body: parsed, device, receivedAt, rawPayloadHash: payloadHash });
+  const mapped = adapter.map({ body: payload, device, receivedAt, rawPayloadHash: payloadHash });
 
   try {
     if (!mapped.ok) {

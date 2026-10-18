@@ -9,6 +9,7 @@ import {
   type IngestRepository,
   type RawPayloadToStore,
   type ReadingOutcome,
+  type StoredRawPayload,
   type StoredReading,
 } from './repository';
 
@@ -128,6 +129,20 @@ export class MemoryIngestRepository implements IngestRepository {
   listEvents(deviceId: string): Promise<IngestEventToStore[]> {
     return Promise.resolve(
       this.events.filter((e) => e.deviceId === deviceId).map((e) => structuredClone(e)),
+    );
+  }
+
+  listRawPayloads(deviceId: string): Promise<StoredRawPayload[]> {
+    return Promise.resolve(
+      [...this.raw.values()]
+        .filter((r) => r.deviceId === deviceId)
+        .map((r) => ({
+          payloadHash: r.payloadHash,
+          payload: structuredClone(r.payload),
+          parseStatus: r.parseStatus,
+          errorCode: r.errorCode,
+          strippedKeys: [...r.strippedKeys],
+        })),
     );
   }
 

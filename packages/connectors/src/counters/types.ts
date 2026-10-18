@@ -107,9 +107,21 @@ export interface CounterMapInput {
   rawPayloadHash: string;
 }
 
+/** A request body with fields we must not keep removed (data minimisation). */
+export interface CounterMinimiseResult {
+  payload: unknown;
+  /** Names of the keys removed, sorted. Never their values. */
+  strippedKeys: string[];
+}
+
 export interface CounterAdapter {
   /** Provider key used in the ingest URL: `/api/ingest/counters/<provider>`. */
   readonly provider: string;
+  /**
+   * Remove what counting does not need (device and SIM identifiers) before
+   * the body is stored or mapped. Optional: without it the body is kept as is.
+   */
+  minimise?(body: unknown): CounterMinimiseResult;
   map(input: CounterMapInput): CounterMapOutcome;
 }
 

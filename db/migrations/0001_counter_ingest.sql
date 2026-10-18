@@ -76,14 +76,19 @@ create table counter_raw_payloads (
   received_at    timestamptz not null,
   parse_status   text        not null check (parse_status in ('mapped', 'rejected')),
   error_code     text        check (error_code is null or error_code ~ '^[a-z_]{1,40}$'),
+  -- About the stored payload, not from it. {"stripped_keys": [...]}: names of
+  -- the keys data minimisation removed before storage (device and SIM
+  -- identifiers such as network_info, device_mac, ip_address). Never values.
+  metadata       jsonb       not null default '{}'::jsonb check (jsonb_typeof(metadata) = 'object'),
   foreign key (device_id, venue_id) references counter_devices (device_id, venue_id)
     on update cascade on delete restrict,
-  -- The same body re-sent by the device is stored once.
+  -- The same body re-sent by the device is stored once. payload_hash is over
+  -- the exact bytes received (before minimisation), so re-sends still match.
   unique (device_id, payload_hash)
 );
 
 comment on table counter_raw_payloads is
-  'Request bodies as received, so a mapping bug can be fixed and replayed without asking the device to resend.';
+  'Request bodies as received minus device and SIM identifiers, so a mapping bug can be fixed and replayed without asking the device to resend.';
 
 -- Readings --------------------------------------------------------------------
 
