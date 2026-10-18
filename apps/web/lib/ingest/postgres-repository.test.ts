@@ -107,6 +107,10 @@ describe('migration 0001_counter_ingest.sql', () => {
         venue_id: 'another-venue',
       }),
     ).rejects.toThrow(/foreign key/i);
+    // Longer than 24 hours (also bounds the overlap lookup).
+    await expect(
+      insert({ interval_start: '2026-10-18T00:00:00Z', interval_end: '2026-10-19T00:00:01Z' }),
+    ).rejects.toThrow(/check/i);
   });
 
   it('keeps at most two secret hashes per device', async () => {

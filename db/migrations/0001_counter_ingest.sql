@@ -113,6 +113,9 @@ create table counter_readings (
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
   check (interval_end > interval_start),
+  -- Longest interval accepted (MAX_READING_INTERVAL_HOURS in repository.ts);
+  -- also bounds the overlap lookup.
+  check (interval_end - interval_start <= interval '24 hours'),
   foreign key (device_id, venue_id) references counter_devices (device_id, venue_id)
     on update cascade on delete restrict,
   foreign key (device_id, raw_payload_hash) references counter_raw_payloads (device_id, payload_hash)
@@ -139,7 +142,8 @@ create table counter_ingest_events (
                  'reading_rejected_clock',
                  'device_alarm',
                  'payload_rejected',
-                 'device_mismatch'
+                 'device_mismatch',
+                 'overlap_detected'
                )),
   occurred_at  timestamptz not null default now(),
   -- Fixed vocabulary, ids, timestamps and counts. Never payload text or secrets.

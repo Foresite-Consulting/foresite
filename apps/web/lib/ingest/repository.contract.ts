@@ -280,6 +280,49 @@ export function describeRepositoryContract(
       ]);
     });
 
+    it('stores overlapping intervals as distinct rows and flags the overlap (review F5)', async () => {
+      // Three 5-minute readings, then one 15-minute reading over the last two
+      // (a reporting period changed on the device), plus an adjacent one.
+      await repo.ingest(
+        batch(h(1), [
+          reading(0, { in: 1, out: 0 }),
+          reading(1, { in: 2, out: 0 }),
+          reading(2, { in: 3, out: 0 }),
+        ]),
+      );
+      const long: ReadingToStore = {
+        ...reading(1, { in: 9, out: 0 }, { hash: h(2) }),
+        intervalEnd: reading(3, { in: 0, out: 0 }).intervalStart,
+      };
+      const adjacent = reading(3, { in: 4, out: 0 }, { hash: h(2) });
+      const other = reading(1, { in: 5, out: 0 }, { hash: h(2), entry: 'side' });
+      const result = await repo.ingest(batch(h(2), [long, adjacent, other]));
+      expect(result.outcomes.map((o) => o.kind)).toEqual(['accepted', 'accepted', 'accepted']);
+      expect(await repo.listReadings('contract-dev')).toHaveLength(6);
+      const overlaps = (await repo.listEvents('contract-dev')).filter(
+        (e) => e.type === 'overlap_detected',
+      );
+      expect(overlaps).toEqual([
+        {
+          venueId: CONTRACT_DEVICE.venueId,
+          deviceId: CONTRACT_DEVICE.deviceId,
+          type: 'overlap_detected',
+          occurredAt: long.receivedAt,
+          detail: {
+            entry_point_id: 'front',
+            interval_start: long.intervalStart,
+            interval_end: long.intervalEnd,
+            overlapping_readings: 2,
+          },
+        },
+      ]);
+      // A re-send of the long reading is a duplicate and is not flagged again.
+      await repo.ingest(batch(h(3), [long]));
+      expect(
+        (await repo.listEvents('contract-dev')).filter((e) => e.type === 'overlap_detected'),
+      ).toHaveLength(1);
+    });
+
     it('writes the request summary in the same batch', async () => {
       await repo.ingest(batch(h(1), [reading(0, { in: 5, out: 1 })]));
       const summary = (await repo.listEvents('contract-dev')).find((e) => e.type === 'request');

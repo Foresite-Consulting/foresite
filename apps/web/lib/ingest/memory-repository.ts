@@ -1,6 +1,8 @@
 import {
   conflictEvent,
   decideReading,
+  intervalsOverlap,
+  overlapEvent,
   readingKey,
   type DeviceRecord,
   type IngestBatch,
@@ -76,6 +78,13 @@ export class MemoryIngestRepository implements IngestRepository {
           revision: 1,
         };
         if (existing === undefined) {
+          const overlapping = [...this.readings.values()].filter(
+            (r) =>
+              r.deviceId === incoming.deviceId &&
+              r.entryPointId === incoming.entryPointId &&
+              intervalsOverlap(r, incoming),
+          ).length;
+          if (overlapping > 0) newEvents.push(overlapEvent(incoming, overlapping));
           this.readings.set(key, stored);
           outcomes.push({ kind: 'accepted' });
           continue;

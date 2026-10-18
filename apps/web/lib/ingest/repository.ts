@@ -48,6 +48,7 @@ export const INGEST_EVENT_TYPES = [
   'device_alarm',
   'payload_rejected',
   'device_mismatch',
+  'overlap_detected',
 ] as const;
 export type IngestEventType = (typeof INGEST_EVENT_TYPES)[number];
 
@@ -160,6 +161,45 @@ export function decideReading(
   const existingAt = Date.parse(existing.deviceReportedAt);
   const incomingAt = Date.parse(incoming.deviceReportedAt);
   return incomingAt >= existingAt ? 'replace' : 'keep_existing';
+}
+
+/**
+ * Longest reading interval storage accepts (also a check constraint). Bounds
+ * the overlap lookup to a range scan of the natural-key index.
+ */
+export const MAX_READING_INTERVAL_HOURS = 24;
+
+/** Whether two half-open intervals [start, end) overlap. ISO 8601 UTC strings. */
+export function intervalsOverlap(
+  a: { intervalStart: string; intervalEnd: string },
+  b: { intervalStart: string; intervalEnd: string },
+): boolean {
+  return (
+    Date.parse(a.intervalStart) < Date.parse(b.intervalEnd) &&
+    Date.parse(b.intervalStart) < Date.parse(a.intervalEnd)
+  );
+}
+
+/**
+ * A newly stored reading overlaps readings already stored for the same
+ * device and entry point with a different interval (review F5), e.g. a device
+ * whose reporting period was changed from 5 to 60 minutes and back. Both are
+ * kept; this event flags the overlap so the trading-day join (and an
+ * operator) can tell. Not a rejection.
+ */
+export function overlapEvent(reading: ReadingToStore, overlapping: number): IngestEventToStore {
+  return {
+    venueId: reading.venueId,
+    deviceId: reading.deviceId,
+    type: 'overlap_detected',
+    occurredAt: reading.receivedAt,
+    detail: {
+      entry_point_id: reading.entryPointId,
+      interval_start: reading.intervalStart,
+      interval_end: reading.intervalEnd,
+      overlapping_readings: overlapping,
+    },
+  };
 }
 
 export function conflictEvent(

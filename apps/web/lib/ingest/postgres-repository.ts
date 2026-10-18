@@ -1,6 +1,8 @@
 import {
   conflictEvent,
   decideReading,
+  MAX_READING_INTERVAL_HOURS,
+  overlapEvent,
   type DeviceRecord,
   type IngestBatch,
   type IngestBatchResult,
@@ -206,6 +208,26 @@ export class PostgresIngestRepository implements IngestRepository {
           ],
         );
         if (inserted.length > 0) {
+          // Flag (never reject) overlap with other intervals at this entry
+          // point. Bounded by the longest allowed interval, so it is a range
+          // scan of the natural-key index.
+          const [overlap] = await tx.query<{ n: number | string }>(
+            `select count(*)::int as n from counter_readings
+              where device_id = $1::text and entry_point_id = $2::text
+                and interval_start < $4::timestamptz
+                and interval_start > $3::timestamptz - make_interval(hours => $5::int)
+                and interval_end > $3::timestamptz
+                and not (interval_start = $3::timestamptz and interval_end = $4::timestamptz)`,
+            [
+              r.deviceId,
+              r.entryPointId,
+              r.intervalStart,
+              r.intervalEnd,
+              MAX_READING_INTERVAL_HOURS,
+            ],
+          );
+          const overlapping = Number(overlap?.n ?? 0);
+          if (overlapping > 0) await insertEvent(tx, overlapEvent(r, overlapping));
           outcomes.push({ kind: 'accepted' });
           continue;
         }
