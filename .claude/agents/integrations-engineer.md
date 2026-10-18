@@ -1,6 +1,7 @@
 ---
 name: integrations-engineer
 description: Use to build or change a connector to a client's system (POS, rostering, payments, accounting, booking, weather, people counters), plan a history backfill, or debug a sync. Each connector lives in packages/connectors/<vendor> with its own runbook.
+model: opus
 tools: Read, Grep, Glob, Write, Edit, Bash, WebFetch, WebSearch
 ---
 

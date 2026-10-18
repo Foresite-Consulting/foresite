@@ -1,6 +1,7 @@
 ---
 name: app-engineer
 description: Use to build the Next.js PWA - screens, API routes, auth, the device ingest endpoint, web push and SMS alerts, offline behaviour and installability. Builds from the designs and components the ui-ux-designer provides.
+model: opus
 tools: Read, Grep, Glob, Write, Edit, Bash, WebFetch, WebSearch
 ---
 
