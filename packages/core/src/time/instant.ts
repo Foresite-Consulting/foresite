@@ -104,7 +104,8 @@ export function wallToEpochMs(
   // The wall time is in a gap. `earlier` sits just before the gap, so the
   // next transition is the moment the clocks jump.
   const jump = earlier.getTimeZoneTransition('next');
-  /* v8 ignore next 3 -- unreachable: a gap always ends in a transition */
+  // Unreachable: a gap always ends in a transition.
+  /* v8 ignore next -- @preserve */
   if (jump === null) {
     throw new RangeError(`No time-zone transition after ${earlier.toString()}`);
   }

@@ -65,3 +65,35 @@ export {
   type SectionInterval,
   type TradingInterval,
 } from './buckets';
+export {
+  DEFAULT_SYNTHETIC_SEED,
+  DEFAULT_SYNTHETIC_START_DAY,
+  SYNTHETIC_GENERATOR_VERSION,
+  SYNTHETIC_NOTICE,
+  generateSyntheticData,
+  syntheticOptionsSchema,
+  type ResolvedSyntheticOptions,
+  type SyntheticAnomaly,
+  type SyntheticAnomalyKind,
+  type SyntheticDataset,
+  type SyntheticIntervalRow,
+  type SyntheticOptions,
+  type SyntheticPeopleCountRow,
+} from './synthetic/generate';
+export {
+  INTERVAL_COLUMNS,
+  PEOPLE_COUNT_COLUMNS,
+  WEATHER_COLUMNS,
+  datasetFiles,
+  toCsv,
+} from './synthetic/csv';
+export { SAMPLE_WA_PUBLIC_HOLIDAYS, type PublicHoliday } from './synthetic/holidays';
+export {
+  SYNTHETIC_ENTRY_POINTS,
+  SYNTHETIC_SECTION_IDS,
+  SYNTHETIC_VENUE_ID,
+  SYNTHETIC_VENUE_NAME,
+  type SyntheticEntryPoint,
+  type SyntheticSectionId,
+} from './synthetic/venue';
+export { type SyntheticWeatherDay } from './synthetic/weather';

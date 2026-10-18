@@ -78,7 +78,7 @@ const tradingDate = z
 export const sessionSchema = z.object({ open: clockTime, close: clockTime }).strict();
 export type Session = z.output<typeof sessionSchema>;
 
-const sessionList = z.array(sessionSchema).max(MAX_SESSIONS_PER_DAY);
+const sessionList = z.array(sessionSchema).max(MAX_SESSIONS_PER_DAY).readonly();
 
 const weeklyHoursSchema = z
   .object(
@@ -354,9 +354,11 @@ export function safeParseVenue(
 }
 
 function deepFreeze<T>(value: T): T {
-  if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
-    Object.freeze(value);
+  // Recurse even into already-frozen arrays (zod freezes `.readonly()` ones
+  // but not their elements). The parsed venue is a tree, so no cycles.
+  if (typeof value === 'object' && value !== null) {
     for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
   }
   return value;
 }

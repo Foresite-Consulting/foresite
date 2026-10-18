@@ -156,7 +156,8 @@ function findInterval(intervals: readonly MsInterval[], ms: number): MsInterval 
       high = mid - 1;
     }
   }
-  /* v8 ignore next 3 -- unreachable: intervals tile the trading day */
+  // Unreachable: intervals tile the trading day.
+  /* v8 ignore next -- @preserve */
   if (found === undefined || ms >= found.endMs) {
     throw new RangeError(`No interval contains ${formatUtc(ms)}`);
   }

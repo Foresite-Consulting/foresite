@@ -54,7 +54,8 @@ export function daysBetween(from: TradingDay, to: TradingDay): number {
 export function weekdayOf(day: TradingDay): Weekday {
   // dayOfWeek is 1 (Monday) to 7 (Sunday) in the ISO calendar.
   const weekday = WEEKDAYS[parseTradingDay(day).dayOfWeek - 1];
-  /* v8 ignore next -- unreachable: the ISO calendar has seven weekdays */
+  // Unreachable: the ISO calendar has seven weekdays.
+  /* v8 ignore next -- @preserve */
   if (weekday === undefined) throw new RangeError(`No weekday for ${day}`);
   return weekday;
 }
