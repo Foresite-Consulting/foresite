@@ -38,7 +38,7 @@ from foresite_forecast.accuracy import (
     write_forecast_log,
 )
 from foresite_forecast.baseline import BaselineModel
-from foresite_forecast.csvio import LogLockedError, parse_iso_date, write_csv
+from foresite_forecast.csvio import LogLockedError, atomic_text_writer, parse_iso_date, write_csv
 from foresite_forecast.errors import DataValidationError
 from foresite_forecast.model import MAX_HORIZON_DAYS
 from foresite_forecast.schema import (
@@ -211,15 +211,22 @@ def _print_table(title: str, df: pl.DataFrame, key: str | None) -> None:
         )
 
 
+def _write_table(path: Path, table: pl.DataFrame) -> None:
+    write_csv(path, table.columns, table.iter_rows())
+
+
 def _cmd_accuracy(args: argparse.Namespace) -> int:
     actuals = read_daily_actuals(_existing(args.actuals, "actuals"))
     log = forecasts_to_frame(read_forecast_log(_existing(args.forecasts, "forecast log")))
     scored = score(log, actuals)
     report = accuracy_report(scored)
     if args.out_dir is not None:
+        targets = {name: args.out_dir / f"accuracy_{name}.csv" for name in report.tables()}
+        for target in targets.values():
+            _distinct_output(target, args.actuals, args.forecasts)
         args.out_dir.mkdir(parents=True, exist_ok=True)
         for name, table in report.tables().items():
-            table.write_csv(args.out_dir / f"accuracy_{name}.csv")
+            _write_table(targets[name], table)
     if args.json:
         print(
             json.dumps({k: v.to_dicts() for k, v in report.tables().items()}, default=str, indent=2)
@@ -243,6 +250,8 @@ def _cmd_accuracy(args: argparse.Namespace) -> int:
 
 
 def _cmd_evaluate(args: argparse.Namespace) -> int:
+    if args.alerts_out is not None:
+        _distinct_output(args.alerts_out, args.actuals, args.challenger, args.baseline)
     actuals = read_daily_actuals(_existing(args.actuals, "actuals"))
     challenger = forecasts_to_frame(read_forecast_log(_existing(args.challenger, "challenger log")))
     baseline = forecasts_to_frame(read_forecast_log(_existing(args.baseline, "baseline log")))
@@ -261,8 +270,7 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
     )
     alerts = [d.alert for d in decisions if d.alert is not None]
     if args.alerts_out is not None:
-        _distinct_output(args.alerts_out, args.actuals, args.challenger, args.baseline)
-        with args.alerts_out.open("w", encoding="utf-8") as handle:
+        with atomic_text_writer(args.alerts_out) as handle:
             for alert in alerts:
                 handle.write(json.dumps(alert.as_dict(), sort_keys=True) + "\n")
     if args.json:

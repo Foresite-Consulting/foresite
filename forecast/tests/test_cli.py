@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import subprocess
 import sys
 from pathlib import Path
 
+import polars as pl
 import pytest
 
 from foresite_forecast.accuracy import LOG_COLUMNS, read_forecast_log
@@ -120,7 +122,12 @@ def test_accuracy_command(files: Path, tmp_path: Path, capsys: pytest.CaptureFix
     assert code == 0
     assert "By horizon bucket" in out
     assert "WAPE" in out
-    assert (tmp_path / "acc" / "accuracy_rolling_4_weeks.csv").exists()
+    rolling = tmp_path / "acc" / "accuracy_rolling_4_weeks.csv"
+    table = pl.read_csv(rolling, try_parse_dates=True)
+    assert {"week_start", "wape", "coverage", "weeks_with_data"} <= set(table.columns)
+    assert table.height > 0
+    assert table["wape"].dtype == pl.Float64
+    assert not [p.name for p in (tmp_path / "acc").iterdir() if p.name.startswith(".")]
     code, out, _ = run(
         capsys,
         "accuracy",
@@ -132,6 +139,102 @@ def test_accuracy_command(files: Path, tmp_path: Path, capsys: pytest.CaptureFix
     )
     assert code == 0
     assert set(json.loads(out)) >= {"overall", "by_horizon", "rolling_4_weeks"}
+
+
+def test_accuracy_out_dir_never_overwrites_an_input(
+    files: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    inputs = tmp_path / "in"
+    inputs.mkdir()
+    victim = inputs / "accuracy_overall.csv"  # an input that happens to share a table's name
+    victim.write_bytes((files / "baseline_log.csv").read_bytes())
+    before = victim.read_bytes()
+    code, _, err = run(
+        capsys,
+        "accuracy",
+        "--forecasts",
+        str(victim),
+        "--actuals",
+        str(files / "synthetic_actuals.csv"),
+        "--out-dir",
+        str(inputs),
+    )
+    assert code == 2
+    assert "would overwrite an input file" in err
+    assert victim.read_bytes() == before
+    assert sorted(p.name for p in inputs.iterdir()) == ["accuracy_overall.csv"]
+
+
+def test_alerts_out_is_written_atomically(
+    files: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bad = tmp_path / "bad.csv"
+    code, _, _ = run(
+        capsys,
+        "synthetic-challenger",
+        "--baseline-log",
+        str(files / "baseline_log.csv"),
+        "--actuals",
+        str(files / "synthetic_actuals.csv"),
+        "--quality",
+        "bad",
+        "--out",
+        str(bad),
+    )
+    assert code == 0
+    alerts = tmp_path / "alerts.jsonl"
+    alerts.write_text("previous run\n")
+    argv = [
+        "evaluate",
+        "--challenger",
+        str(bad),
+        "--baseline",
+        str(files / "baseline_log.csv"),
+        "--actuals",
+        str(files / "synthetic_actuals.csv"),
+        "--alerts-out",
+        str(alerts),
+    ]
+
+    def disk_full(*_a: object, **_k: object) -> str:
+        raise OSError("disk full")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(json, "dumps", disk_full)
+        code, _, err = run(capsys, *argv)
+    assert code == 2
+    assert "disk full" in err
+    assert alerts.read_text() == "previous run\n"  # a failed write leaves the old file
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["alerts.jsonl", "bad.csv"]
+    code, _, _ = run(capsys, *argv)
+    assert code == 0
+    (alert,) = [json.loads(line) for line in alerts.read_text().splitlines()]
+    assert alert["kind"] == "forecast_rollback"
+
+
+def test_locked_log_exits_2(
+    files: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    log = tmp_path / "log.csv"
+    argv = [
+        "baseline",
+        "--input",
+        str(files / "synthetic_actuals.csv"),
+        "--as-of",
+        "2025-06-30",
+        "--horizon",
+        "2",
+        "--out",
+        str(tmp_path / "f.csv"),
+        "--log",
+        str(log),
+    ]
+    with (tmp_path / "log.csv.lock").open("a") as other:
+        fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        code, _, err = run(capsys, *argv)
+    assert code == 2
+    assert "only one writer per log at a time" in err
+    assert not log.exists()
 
 
 def test_evaluate_rollback_scenario(
@@ -336,7 +439,7 @@ def test_evaluate_rollback_scenario(
                 "--alerts-out",
                 "{d}/baseline_log.csv",
             ],
-            "same model",
+            "would overwrite an input file",
         ),
     ],
 )
