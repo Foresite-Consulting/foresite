@@ -15,7 +15,7 @@ These map existing palette colours onto new semantic tokens. No brand colour was
 | ---------- | ----------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `positive` | Moss `#3E7268`    | Jade `#6DA097`     | Direction indicator (icon only; the words use text colours). Jade on Serpentine is 4.39:1, so it may not be used as body text in dark.                             |
 | `negative` | Ember `#C2412C`   | Coral `#FF6650`    | As above. Coral on Serpentine is 4.48:1, so icon only.                                                                                                             |
-| `link`     | Ember (unchanged) | **Mist** `#F4F7F6` | The guide's Coral link on a Serpentine surface measures 4.49:1, just under AA 4.5:1. Links are always underlined, so Mist stays distinct. **For Joel to confirm.** |
+| `link`     | Ember (unchanged) | **Mist** `#F4F7F6` | The guide's Coral link on a Serpentine surface measures 4.48:1, just under AA 4.5:1. Links are always underlined, so Mist stays distinct. **For Joel to confirm.** |
 
 ## Colour mapping and contrast (WCAG 2.1 AA: 4.5:1 body text, 3:1 large text, UI and chart lines)
 

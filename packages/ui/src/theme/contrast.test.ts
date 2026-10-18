@@ -101,6 +101,14 @@ describe('Foresite theme contrast (WCAG 2.1 AA)', () => {
     );
   });
 
+  it('quotes the same Coral-on-Serpentine ratio in the theme rules as the checker reports', () => {
+    // theme:check rounds down (roundRatio), so the recorded figure is 4.48:1.
+    const ratio = roundRatio(contrastRatio(foresite.palette.coral!, foresite.palette.serpentine!));
+    expect(ratio).toBe(4.48);
+    const rule = foresite.rules.find((r) => r.includes('Coral on Serpentine'));
+    expect(rule).toContain(`${ratio.toFixed(2)}:1`);
+  });
+
   it('prints a table with a row per pairing', () => {
     const table = formatContrastTable(results);
     const lines = table.split('\n');
