@@ -1,7 +1,9 @@
-"""Foresite forecast engine.
+"""Foresite forecast engine: baseline forecasts, likely ranges, accuracy tracking
+and champion/challenger selection with automatic rollback to the baseline.
 
-Empty until the forecast engine PR lands. Keeping the package importable lets
-CI run ruff, mypy and pytest from day one.
+Forecasts are estimates, never guarantees.
 """
 
-__all__: list[str] = []
+__version__ = "0.2.0"
+
+__all__ = ["__version__"]

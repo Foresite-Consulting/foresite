@@ -1,17 +1,22 @@
 [project]
 name = "foresite-forecast"
-version = "0.1.0"
-description = "Foresite forecast engine: LightGBM with a quantile range, weekly retrain, accuracy tracking and baseline rollback. Placeholder until the engine PR lands."
+version = "0.2.0"
+description = "Foresite forecast engine: same-weekday-last-year baseline with trend, empirical likely range, accuracy tracking and champion/challenger rollback. LightGBM model to follow."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "UNLICENSED" }
-dependencies = []
+dependencies = [
+  "numpy==2.5.3",
+  "polars==1.44.2",
+]
 
 [dependency-groups]
 dev = [
+  "hypothesis==6.168.1",
   "mypy==1.18.2",
   "pip-audit==2.9.0",
   "pytest==9.0.3",
+  "pytest-cov==7.1.0",
   "ruff==0.14.4",
 ]
 
