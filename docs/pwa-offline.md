@@ -1,6 +1,6 @@
 # PWA and offline behaviour
 
-The app installs from `/manifest.webmanifest`, which `apps/web/app/manifest.ts` builds from the active theme (name, short name, colours, icons). Icons, logo and favicon are served from `themes/<slug>/` by `/theme-assets/<file>`; only files the theme declares are served.
+The app installs from `/manifest.webmanifest`, which `apps/web/app/manifest.ts` builds from the active theme (name, short name, colours, icons). Icons, logo and favicon are served from `themes/<slug>/` by `/theme-assets/<file>`; only files the theme declares are served, only as PNG, SVG, ICO or WebP (the theme schema rejects other extensions at load time), and every response carries `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`, `X-Content-Type-Options: nosniff` and `Cross-Origin-Resource-Policy: same-origin`, so an SVG opened directly cannot run script.
 
 ## What the service worker caches
 

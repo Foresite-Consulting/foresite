@@ -1,10 +1,13 @@
 export {
   SEMANTIC_KEYS,
+  THEME_ASSET_CONTENT_TYPES,
   THEME_MODES,
+  themeAssetContentType,
   themeTokensSchema,
   type ResolvedColours,
   type ResolvedTheme,
   type SemanticKey,
+  type ThemeAssetExtension,
   type ThemeMode,
   type ThemeTokens,
   type TypeScale,

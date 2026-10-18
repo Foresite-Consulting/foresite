@@ -141,6 +141,20 @@ describe('loadTheme (client overlay)', () => {
     expect(() => loadTheme({ slug: 'acme', themesDir })).toThrow(/not valid JSON/);
   });
 
+  it('fails at load time on an asset with an unsupported extension', () => {
+    writeClient('acme', { client: { logo: 'logo.gif' } });
+    expect(() => loadTheme({ slug: 'acme', themesDir })).toThrow(
+      /client\.logo: must end in \.png, \.svg, \.ico, \.webp/,
+    );
+  });
+
+  it('fails at load time on an asset path outside the theme folder', () => {
+    for (const bad of ['../tokens.json', '../../secret.png', 'sub/logo.svg', '.hidden.png']) {
+      writeClient('acme', { client: { favicon: bad } });
+      expect(() => loadTheme({ slug: 'acme', themesDir }), bad).toThrow(/client\.favicon/);
+    }
+  });
+
   it('accepts literal hex values in semantic tokens', () => {
     writeClient('acme', { semantic: { light: { brand: '#abcdef' } } });
     expect(loadTheme({ slug: 'acme', themesDir }).colours.light.brand).toBe('#ABCDEF');

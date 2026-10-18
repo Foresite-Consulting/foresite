@@ -1,14 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { NextResponse } from 'next/server';
+import { themeAssetContentType } from '@foresite/ui/theme';
 import { getTheme } from '@/lib/theme';
+import { THEME_ASSET_HEADERS } from '@/lib/theme-assets';
 
-const CONTENT_TYPES: Record<string, string> = {
-  png: 'image/png',
-  svg: 'image/svg+xml',
-  ico: 'image/x-icon',
-  webp: 'image/webp',
-};
+function notFound() {
+  return new NextResponse('Not found', {
+    status: 404,
+    headers: { ...THEME_ASSET_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' },
+  });
+}
 
 /**
  * Serves the active theme's logo, icons and favicon from `themes/<slug>/`.
@@ -26,28 +28,25 @@ export async function GET(_request: Request, context: { params: Promise<{ file: 
       ...theme.assets.icons,
     ].filter((name): name is string => name !== null),
   );
-  if (!allowed.has(file)) {
-    return new NextResponse('Not found', { status: 404 });
-  }
-  const extension = file.split('.').pop()?.toLowerCase() ?? '';
-  const contentType = CONTENT_TYPES[extension];
-  if (contentType === undefined) {
-    return new NextResponse('Not found', { status: 404 });
-  }
+  if (!allowed.has(file)) return notFound();
+  // The theme schema already restricts extensions; checked again here so the
+  // route never serves a type it has no Content-Type for.
+  const contentType = themeAssetContentType(file);
+  if (contentType === undefined) return notFound();
 
   let body: Buffer;
   try {
     body = await readFile(join(theme.dir, file));
   } catch {
-    return new NextResponse('Not found', { status: 404 });
+    return notFound();
   }
 
   return new NextResponse(new Uint8Array(body), {
     status: 200,
     headers: {
+      ...THEME_ASSET_HEADERS,
       'Content-Type': contentType,
       'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
-      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

@@ -30,6 +30,44 @@ const hexColour = z
   .string()
   .regex(HEX_PATTERN, 'must be a 6-digit hex colour such as #04282C (no shorthand, no alpha)');
 
+/**
+ * File types a theme may supply for its logo, icons and favicon, with the
+ * Content-Type `/theme-assets/<file>` serves them as.
+ */
+export const THEME_ASSET_CONTENT_TYPES = {
+  png: 'image/png',
+  svg: 'image/svg+xml',
+  ico: 'image/x-icon',
+  webp: 'image/webp',
+} as const;
+
+export type ThemeAssetExtension = keyof typeof THEME_ASSET_CONTENT_TYPES;
+
+/** Content-Type for a theme asset file name, or undefined if the extension is not allowed. */
+export function themeAssetContentType(file: string): string | undefined {
+  const extension = file.split('.').pop()?.toLowerCase() ?? '';
+  return Object.hasOwn(THEME_ASSET_CONTENT_TYPES, extension)
+    ? THEME_ASSET_CONTENT_TYPES[extension as ThemeAssetExtension]
+    : undefined;
+}
+
+/**
+ * A file directly inside the theme folder: no slashes, no leading dot, and one
+ * of the allowed extensions, so a bad theme fails at load time rather than
+ * when the asset is first requested.
+ */
+const assetFile = z
+  .string()
+  .regex(
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/,
+    'must be a file name in the theme folder (letters, digits, ".", "_", "-"; no slashes)',
+  )
+  .refine((file) => themeAssetContentType(file) !== undefined, {
+    message: `must end in ${Object.keys(THEME_ASSET_CONTENT_TYPES)
+      .map((ext) => `.${ext}`)
+      .join(', ')}`,
+  });
+
 /** A palette name (e.g. "ink") or a literal hex colour. */
 const colourRef = z.string().min(1, 'must name a palette colour or give a hex value');
 
@@ -70,10 +108,10 @@ const clientSchema = z
       .min(1)
       .max(12, 'short names must be 12 characters or fewer')
       .nullable(),
-    logo: z.string().min(1).nullable(),
-    logoOnDark: z.string().min(1).nullable(),
-    icons: z.array(z.string().min(1)),
-    favicon: z.string().min(1).nullable(),
+    logo: assetFile.nullable(),
+    logoOnDark: assetFile.nullable(),
+    icons: z.array(assetFile),
+    favicon: assetFile.nullable(),
   })
   .strict();
 

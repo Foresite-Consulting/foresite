@@ -215,6 +215,10 @@ test.describe('PWA plumbing', () => {
       const iconResponse = await request.get(icon.src);
       expect(iconResponse.status(), icon.src).toBe(200);
       expect(iconResponse.headers()['content-type']).toBe('image/png');
+      expect(iconResponse.headers()['content-security-policy']).toBe(
+        "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      );
+      expect(iconResponse.headers()['cross-origin-resource-policy']).toBe('same-origin');
     }
   });
 
