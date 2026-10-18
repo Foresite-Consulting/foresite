@@ -137,15 +137,41 @@ describe('generated SQL against the real migration (PGlite)', () => {
     });
     expect(await verifyDeviceSecret(first, device!.secretHashes[0]!)).toBe(true);
 
+    const updatedAt = async () =>
+      (
+        await db.query<{ d: string; c: string }>(
+          `select d.updated_at::text as d, c.updated_at::text as c
+             from counter_devices d join counter_device_credentials c using (device_id)
+            where device_id = 'ven1-door-01'`,
+        )
+      ).rows[0]!;
+    await db.exec(`update counter_devices set updated_at = '2000-01-01T00:00:00Z';
+      update counter_device_credentials set updated_at = '2000-01-01T00:00:00Z'`);
+
+    // Step 2 before step 1: raises, changes nothing (review F8).
+    await expect(db.exec(finishRotationSql('ven1-door-01'))).rejects.toThrow(
+      /no rotation in progress \(0 rows updated, expected 1\)/,
+    );
     const second = generateDeviceSecret();
     await db.exec(rotateDeviceSql('ven1-door-01', await hashDeviceSecret(second)));
-    // Running step 1 again while a rotation is in progress changes nothing.
-    await db.exec(rotateDeviceSql('ven1-door-01', await hashDeviceSecret(generateDeviceSecret())));
+    const touched = await updatedAt();
+    expect(touched.d).not.toMatch(/^2000-/);
+    expect(touched.c).not.toMatch(/^2000-/);
+    // Running step 1 again while a rotation is in progress raises and changes nothing.
+    await expect(
+      db.exec(rotateDeviceSql('ven1-door-01', await hashDeviceSecret(generateDeviceSecret()))),
+    ).rejects.toThrow(/rotation is already in progress/);
+    // So does a typo in the device id.
+    await expect(
+      db.exec(rotateDeviceSql('ven1-door-0l', await hashDeviceSecret(generateDeviceSecret()))),
+    ).rejects.toThrow(/device ven1-door-0l: unknown device/);
     device = await repo.findDevice('milesight', 'ven1-door-01');
     expect(device?.secretHashes).toHaveLength(2);
     expect(await verifyDeviceSecret(second, device!.secretHashes[1]!)).toBe(true);
 
+    await db.exec(`update counter_devices set updated_at = '2000-01-01T00:00:00Z'`);
     await db.exec(finishRotationSql('ven1-door-01'));
+    expect((await updatedAt()).d).not.toMatch(/^2000-/);
     device = await repo.findDevice('milesight', 'ven1-door-01');
     expect(device?.secretHashes).toHaveLength(1);
     expect(await verifyDeviceSecret(second, device!.secretHashes[0]!)).toBe(true);
@@ -189,6 +215,17 @@ describe('device:create script', () => {
     const hash = /array\['(scrypt\$[^']+)'\]/.exec(stdout)?.[1];
     expect(hash).toBeDefined();
     expect(await verifyDeviceSecret(secret!, hash!)).toBe(true);
+  }, 30_000);
+
+  it('warns on stderr that a rotation secret only works if the SQL succeeds', async () => {
+    const { stdout, stderr } = await run(
+      tsx,
+      ['scripts/device-create.ts', '--rotate', '--device', 'ven1-door-01'],
+      { cwd: appDir },
+    );
+    expect(stdout).toContain('raise exception');
+    expect(stderr).toMatch(/WARNING: this secret only works once the SQL above has run/);
+    expect(stdout).not.toContain('WARNING');
   }, 30_000);
 
   it('exits 2 with usage on bad input', async () => {

@@ -174,23 +174,53 @@ commit;
 `;
 }
 
+/**
+ * Wrap an update of `counter_device_credentials` so it raises unless exactly
+ * one row changed (review F8): a typo in the device id, or a rotation already
+ * in progress, fails loudly instead of silently leaving the printed secret
+ * unusable. Also touches the device's `updated_at`. The dollar-quote tag is
+ * one no validated id or encoded hash can contain.
+ */
+function exactlyOneRow(deviceId: string, update: string, problem: string): string {
+  // The id also goes into the error message, so keep it to the safe pattern.
+  if (!DEVICE_ID_PATTERN.test(deviceId)) throw new Error('not a valid device id');
+  const id = sqlLiteral(deviceId);
+  return `do $rotate$
+declare
+  changed integer;
+begin
+${update}
+  get diagnostics changed = row_count;
+  if changed <> 1 then
+    raise exception 'device ${deviceId}: ${problem} (% rows updated, expected 1); nothing changed', changed;
+  end if;
+  update counter_devices set updated_at = now() where device_id = ${id};
+end
+$rotate$;`;
+}
+
 export function rotateDeviceSql(deviceId: string, hash: string): string {
   assertHash(hash);
+  const update = `  update counter_device_credentials
+     set secret_hashes = array[secret_hashes[1], ${sqlLiteral(hash)}], updated_at = now()
+   where device_id = ${sqlLiteral(deviceId)} and cardinality(secret_hashes) = 1;`;
   return `-- Step 1 of 2: add a second secret for ${deviceId}. Both work until step 2.
--- Updates nothing if a rotation is already in progress (two secrets stored).
-update counter_device_credentials
-   set secret_hashes = array[secret_hashes[1], ${sqlLiteral(hash)}], updated_at = now()
- where device_id = ${sqlLiteral(deviceId)} and cardinality(secret_hashes) = 1;
+-- Raises an error, changing nothing, if the device does not exist or a
+-- rotation is already in progress (two secrets stored). If it raises, the
+-- secret printed with this SQL is useless: discard it.
+${exactlyOneRow(deviceId, update, 'unknown device, or a rotation is already in progress')}
 -- Then enter the new secret on the device and check the logs show "secretSlot":2.
 `;
 }
 
 export function finishRotationSql(deviceId: string): string {
+  const update = `  update counter_device_credentials
+     set secret_hashes = array[secret_hashes[2]], updated_at = now()
+   where device_id = ${sqlLiteral(deviceId)} and cardinality(secret_hashes) = 2;`;
   return `-- Step 2 of 2: drop the old secret for ${deviceId}, keeping the new one.
 -- Only run this once the logs show the device using "secretSlot":2.
-update counter_device_credentials
-   set secret_hashes = array[secret_hashes[2]], updated_at = now()
- where device_id = ${sqlLiteral(deviceId)} and cardinality(secret_hashes) = 2;
+-- Raises an error, changing nothing, unless a rotation is in progress.
+${exactlyOneRow(deviceId, update, 'unknown device, or no rotation in progress')}
 `;
 }
 

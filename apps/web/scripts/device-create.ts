@@ -55,6 +55,11 @@ async function main(argv: string[]): Promise<number> {
       const hash = await hashDeviceSecret(secret);
       process.stdout.write(rotateDeviceSql(command.deviceId, hash));
       printSecret(command.deviceId, secret);
+      process.stderr.write(
+        'WARNING: this secret only works once the SQL above has run without error.\n' +
+          'If the SQL raises an error (unknown device, or a rotation already in progress),\n' +
+          'nothing was changed: discard this secret and do not enter it on the device.\n',
+      );
       return 0;
     }
     case 'create': {
