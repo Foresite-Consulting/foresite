@@ -198,6 +198,43 @@ describe('loadTheme (client overlay)', () => {
     }
   });
 
+  describe('NEXT_PUBLIC_THEME', () => {
+    let previous: string | undefined;
+    beforeEach(() => {
+      previous = process.env.NEXT_PUBLIC_THEME;
+    });
+    afterEach(() => {
+      if (previous === undefined) delete process.env.NEXT_PUBLIC_THEME;
+      else process.env.NEXT_PUBLIC_THEME = previous;
+    });
+
+    it('loads the theme the env var names when no slug is passed', () => {
+      writeClient('acme', { client: { name: 'Acme Hotel' } });
+      process.env.NEXT_PUBLIC_THEME = 'acme';
+      const theme = loadTheme({ themesDir });
+      expect(theme.slug).toBe('acme');
+      expect(theme.name).toBe('Acme Hotel');
+    });
+
+    it('falls back to the base theme when the env var is empty', () => {
+      process.env.NEXT_PUBLIC_THEME = '';
+      expect(loadTheme({ themesDir }).slug).toBe('foresite');
+    });
+
+    it('rejects an env var that tries to leave the themes folder', () => {
+      process.env.NEXT_PUBLIC_THEME = '../etc';
+      expect(() => loadTheme({ themesDir })).toThrow(ThemeError);
+      expect(() => loadTheme({ themesDir })).toThrow(
+        /NEXT_PUBLIC_THEME="\.\.\/etc" is not a valid theme name/,
+      );
+    });
+
+    it('lets an explicit slug win over the env var', () => {
+      process.env.NEXT_PUBLIC_THEME = 'acme';
+      expect(loadTheme({ slug: 'foresite', themesDir }).slug).toBe('foresite');
+    });
+  });
+
   it('accepts literal hex values in semantic tokens', () => {
     writeClient('acme', { semantic: { light: { brand: '#abcdef' } } });
     expect(loadTheme({ slug: 'acme', themesDir }).colours.light.brand).toBe('#ABCDEF');

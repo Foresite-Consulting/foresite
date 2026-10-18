@@ -24,6 +24,33 @@ function watchConsole(page: Page): string[] {
   return errors;
 }
 
+/**
+ * axe in a real browser, so colour contrast is checked here (jsdom cannot).
+ * Serious and critical findings fail; lesser ones are reported.
+ */
+async function expectNoBlockingAxeViolations(page: Page) {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+    .analyze();
+  const blocking = results.violations.filter(
+    (v) => v.impact === 'serious' || v.impact === 'critical',
+  );
+  expect(
+    blocking,
+    JSON.stringify(
+      blocking.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })),
+      null,
+      2,
+    ),
+  ).toEqual([]);
+  if (results.violations.length > 0) {
+    console.info(
+      'axe (non-blocking):',
+      results.violations.map((v) => `${v.id} (${v.impact ?? 'n/a'})`).join(', '),
+    );
+  }
+}
+
 test.describe('home page', () => {
   test('loads with the demo KPI tiles and no console errors', async ({ page }) => {
     const errors = watchConsole(page);
@@ -53,27 +80,7 @@ test.describe('home page', () => {
 
   test('has no serious or critical accessibility violations', async ({ page }) => {
     await page.goto('/');
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
-      .analyze();
-    const blocking = results.violations.filter(
-      (v) => v.impact === 'serious' || v.impact === 'critical',
-    );
-    expect(
-      blocking,
-      JSON.stringify(
-        blocking.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })),
-        null,
-        2,
-      ),
-    ).toEqual([]);
-    // Report, but do not fail on, lesser findings.
-    if (results.violations.length > 0) {
-      console.info(
-        'axe (non-blocking):',
-        results.violations.map((v) => `${v.id} (${v.impact ?? 'n/a'})`).join(', '),
-      );
-    }
+    await expectNoBlockingAxeViolations(page);
   });
 
   test('sends the security headers', async ({ request }) => {
@@ -93,7 +100,7 @@ test.describe('home page', () => {
     expect(csp).not.toContain("'unsafe-eval'");
   });
 
-  test('honours the data-theme override', async ({ page }) => {
+  test('honours the data-theme override', async ({ page }, testInfo) => {
     await page.goto('/');
     const background = () =>
       page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
@@ -108,7 +115,10 @@ test.describe('home page', () => {
     const light = await background();
     expect(light).toBe('rgb(244, 247, 246)');
     expect(dark).toBe('rgb(4, 40, 44)');
-    expect([light, dark]).toContain(initial);
+    // With no override the page follows the project's colour scheme.
+    const scheme = testInfo.project.use.colorScheme;
+    expect(scheme === 'light' || scheme === 'dark', `project colorScheme ${scheme}`).toBe(true);
+    expect(initial).toBe(scheme === 'dark' ? dark : light);
   });
 
   test('registers the service worker', async ({ page, browserName }) => {
@@ -234,6 +244,21 @@ test.describe('PWA plumbing', () => {
     const response = await request.get('/api/health');
     expect(response.status()).toBe(200);
     expect(await response.json()).toEqual({ status: 'ok' });
+  });
+
+  test('offline page has no serious or critical accessibility violations, with and without a snapshot', async ({
+    page,
+  }) => {
+    await page.goto('/offline');
+    await expect(page.getByText('No saved numbers on this device yet')).toBeVisible();
+    await expectNoBlockingAxeViolations(page);
+
+    await page.goto('/');
+    await expect(page.getByRole('article')).toHaveCount(6);
+    await page.goto('/offline');
+    await expect(page.getByText('Showing the last numbers we had')).toBeVisible();
+    await expect(page.getByRole('article')).toHaveCount(6);
+    await expectNoBlockingAxeViolations(page);
   });
 
   test('offline page shows the last numbers once the dashboard has been seen', async ({ page }) => {

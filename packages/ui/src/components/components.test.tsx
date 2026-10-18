@@ -8,6 +8,12 @@ import { Button } from './Button';
 import { Card } from './Card';
 import { KpiTile } from './KpiTile';
 
+// Note on axe here: jsdom does no layout or painting, so axe cannot measure
+// colour contrast in these tests (the color-contrast rule is skipped as
+// incomplete). These checks cover roles, names and structure only. The
+// contrast gate is the Playwright axe scan in apps/web/e2e/smoke.spec.ts,
+// which runs in a real browser in light and dark, plus `npm run theme:check`.
+
 describe('Button', () => {
   it('renders a button of type "button" by default and fires onClick', async () => {
     const onClick = vi.fn();
