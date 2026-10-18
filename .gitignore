@@ -17,6 +17,9 @@ apps/web/next-env.d.ts
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+.hypothesis/
 
 # Synthetic data written by `npm run synth` (the README example writes here)
 /synthetic/

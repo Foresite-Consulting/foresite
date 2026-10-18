@@ -8,6 +8,8 @@ Plain-language notes first, then the technical detail. Dates as `18 Oct 2026`.
 
 - The app shell exists: a dashboard of key numbers (demo data only), installable on a phone, with an offline page that shows the last numbers it had and when they were updated.
 - Every number now belongs to a trading day that runs from opening to close, past midnight: Saturday night's 1 am sales count on Saturday. Days are correct on the nights the clocks change, for venues outside WA.
+- Every forecast now comes with a likely range and its accuracy to date, for example "In the likely range 57 of 70 times in the last 10 weeks. Typical error 8% (a week ahead).". Forecasts are estimates, not guarantees.
+- A simple, explainable benchmark forecast (same weekday last year, adjusted for recent trend) that any smarter model has to beat before Phase 2 sign-off, and that takes over automatically, with an alert, if the smarter model is worse four weeks running.
 
 ### Technical
 
@@ -34,6 +36,19 @@ Plain-language notes first, then the technical detail. Dates as `18 Oct 2026`.
   - Data dictionary: an open before the cut-over is on the next calendar date; day lengths with a cut-over in the change band.
   - Instants: `InstantInput` is now `Date | string`; numbers are rejected by the type and at runtime (epoch seconds could pass as milliseconds). New `fromEpochMs(ms)` for explicit conversion. ISO strings with a bracketed annotation (`[...]`) are rejected.
 - Coverage gate: `npm run coverage` (part of `npm run check` and CI) with 95% thresholds for `packages/core`, using `@vitest/coverage-v8` 4.1.11.
+- `forecast/` engine v0.2.0 (see `docs/adr/0004-forecast-baseline-and-accuracy.md`): data contract for daily actuals (plus optional interval actuals and venue calendar) with line-numbered validation; baseline `same weekday last year (364 days) x trend` with a logged fallback chain (holiday matching, neighbouring weeks, recent median, unforecastable); empirical 10-90 likely range from the baseline's own backtest errors by weekday and horizon bucket; CSV forecast log; WAPE/MAPE/bias/coverage by horizon, weekday, section, week and rolling 4 weeks; weekly rollback after 4 complete worse weeks with a deterministic alert; Phase 2 gate (pooled WAPE lower and better in 6 of 8 hold-out weeks); `python -m foresite_forecast` CLI; SYNTHETIC data generator. New dependencies numpy 2.5.3 and polars 1.44.2; dev hypothesis 6.168.1 and pytest-cov 7.1.0. Coverage gate 95%.
+- `docs/data-dictionary.md`: `Forecasts` section.
+
+#### Review follow-ups (PR 4)
+
+- Once the forecast model has been switched back to the simple baseline, it now stays switched back in later weeks, even if a week looks good again, until a person re-checks it against the Phase 2 test. A model that stays worse no longer raises a fresh alert every week.
+- Forecast engine (`forecast/`):
+  - Untracked `forecast/.coverage` (already in `.gitignore`).
+  - Scoring: "only the latest issue counts" now applies before rows without a point are dropped, so a later `unforecastable` re-issue retires the earlier point. Decision 5 in ADR 0004, for Lachlan.
+  - Rollback is enforced as one-way: `decide_rollback(..., state=)` with `RollbackRecord`s, `reinstate()` only on a passing gate, `evaluate --state <file>` (atomic, locked) and `--reinstate --sign-off`. `alert_id` is a hash of venue, metric, challenger id + version and the trigger week, stable across re-runs and later weeks; alerts carry `new`, `trigger_week_start` and `challenger_model_version`; decisions carry `weekly_verdict` and `rollback_record`.
+  - Training window: optional `training_end` column in the forecast log (`<= as_of`; blank for the baseline). The gate refuses hold-out forecasts with `training_end` on or after their target week's Monday; `evaluate --sign-off` requires it on every challenger row. `synthetic-challenger --training-end`.
+  - Files: input size checked with `stat()` before reading; writes flush and `fsync` the temporary file before the rename and `fsync` the folder; forecast-log appends take an `fcntl.flock` advisory lock on `<log>.lock` (one writer per log until Postgres); `accuracy --out-dir` and `evaluate --alerts-out` are atomic and refuse to overwrite an input.
+  - New boundary tests: trend window `as_of − 55` in, `as_of − 56` out; holiday tie-break inside 330-400 days; match fraction at 9 of 10, 10 of 11 and 7 of 8.
 
 ### Fixed (scaffold review)
 

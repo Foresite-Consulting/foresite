@@ -1,17 +1,22 @@
 [project]
 name = "foresite-forecast"
-version = "0.1.0"
-description = "Foresite forecast engine: LightGBM with a quantile range, weekly retrain, accuracy tracking and baseline rollback. Placeholder until the engine PR lands."
+version = "0.2.0"
+description = "Foresite forecast engine: same-weekday-last-year baseline with trend, empirical likely range, accuracy tracking and champion/challenger rollback. LightGBM model to follow."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "UNLICENSED" }
-dependencies = []
+dependencies = [
+  "numpy==2.5.3",
+  "polars==1.44.2",
+]
 
 [dependency-groups]
 dev = [
+  "hypothesis==6.168.1",
   "mypy==1.18.2",
   "pip-audit==2.9.0",
   "pytest==9.0.3",
+  "pytest-cov==7.1.0",
   "ruff==0.14.4",
 ]
 
@@ -31,6 +36,10 @@ src = ["foresite_forecast", "tests"]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "PT", "ANN", "S"]
 ignore = ["ANN401"]
 
+[tool.ruff.lint.isort]
+# `src` lists folders *inside* which ruff looks, so name the packages themselves.
+known-first-party = ["foresite_forecast", "tests"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
 
@@ -45,4 +54,14 @@ files = ["foresite_forecast", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-markers"
+# Coverage is enforced on every run (CI runs plain `uv run pytest`).
+addopts = "-q --strict-markers --cov=foresite_forecast --cov-report=term-missing:skip-covered"
+
+[tool.coverage.run]
+branch = true
+source = ["foresite_forecast"]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+exclude_also = ["if __name__ == .__main__.:"]
