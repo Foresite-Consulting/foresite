@@ -434,9 +434,9 @@ def score(
 
     Applies :func:`latest_issues` first and only then drops rows without a
     point, so a later ``unforecastable`` re-issue supersedes (retires) an
-    earlier point. Keeps rows whose target day is open with a known actual. Adds ``actual``, ``error`` (point - actual),
-    ``abs_error``, ``in_range``, ``weekday`` (1 = Monday), ``week_start``
-    (Monday) and ``horizon_bucket``.
+    earlier point. Keeps rows whose target day is open with a known actual.
+    Adds ``actual``, ``error`` (point - actual), ``abs_error``, ``in_range``,
+    ``weekday`` (1 = Monday), ``week_start`` (Monday) and ``horizon_bucket``.
     """
     cfg = interval_config or IntervalConfig()
     forecastable = latest_issues(log).filter(pl.col("point").is_not_null())
