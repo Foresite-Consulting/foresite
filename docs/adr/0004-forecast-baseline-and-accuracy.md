@@ -94,10 +94,14 @@ Compare the challenger (live model) with the baseline on **matched pairs** (same
 Over the **last 4 complete calendar weeks**:
 
 - any evaluable week not worse → `keep`;
-- all 4 evaluable and worse → `rollback_to_baseline`: serve the baseline and emit an alert (deterministic `alert_id`, so re-running never duplicates it);
+- all 4 evaluable and worse → `rollback_to_baseline`: serve the baseline and emit an alert;
 - anything else (a missing or thin week, no clean week) → `insufficient_data`: keep serving the challenger and report why.
 
-A missing week can never trigger a rollback, and can never hide a good week. Rollback is one-way: going back to the challenger needs a person and a fresh pass of the gate.
+A missing week can never trigger a rollback, and can never hide a good week.
+
+**Rollback is one-way, and enforced.** The weekly rule is stateless, so the decision carries a `RollbackRecord` that `evaluate --state <file>` persists (JSON, written atomically under an advisory lock). While a record is `active` for a challenger id + version at a venue × metric, every later check decides `rollback_to_baseline` and serves the baseline even if the weekly rule alone says `keep` (reported as `weekly_verdict`); each check's verdict is added to the record as a weekly re-confirmation. The only way back is a person re-running the Phase 2 gate and passing it: `evaluate --state <file> --reinstate --sign-off --training-end <day>` marks the record `reinstated` for each venue × metric whose gate passed, and leaves it active otherwise. A new challenger version is a new challenger (it must pass the gate before it goes live), so an old record does not hold it.
+
+**Alert de-duplication.** `alert_id` = hash of venue, metric, challenger id, challenger version and the **trigger week** (the last week of the first all-worse run of 4 in the current unbroken streak of worse weeks). It is therefore the same on every re-run and in every later week while the challenger stays worse, with or without a state file; with a state file it comes from the record. `new` is true only on the check that started the rollback. Consumers de-duplicate on `alert_id`.
 
 ### Phase 2 gate (`beats_baseline`)
 
@@ -123,5 +127,5 @@ Interval coverage is reported but not part of the gate (see below).
 1. Gate defaults: 8 hold-out weeks and 6 of 8 winning weeks, with no minimum improvement margin. Should Phase 2 require a margin (for example 5% lower WAPE) and a coverage floor for the challenger's range (for example 70-90% for a 10-90 range)?
 2. Rollback pools all horizons 1-28. Should it weight the horizons managers use most (for example 1-7 days for rostering)?
 3. Weeks run Monday to Sunday. Confirm this matches how venues report.
-4. `insufficient_data` keeps the challenger live. The alternative is to fall back to the baseline after N insufficient weeks (an outage signal). Which do we want?
+4. `insufficient_data` keeps the challenger live (unless a rollback already stands). The alternative is to fall back to the baseline after N insufficient weeks (an outage signal). Which do we want?
 5. A later `unforecastable` re-issue of the same target and horizon supersedes an earlier point, so that point is no longer scored ("only the latest issue counts", applied literally). The alternative is to keep scoring the last issue that *had* a point. The chosen rule means a model cannot be judged on a number it withdrew, but it also means a model that withdraws hard days drops them from its own accuracy; the rollback and gate comparison still requires the challenger to cover 90% of the baseline's scored forecasts each week, which limits that. Confirm.

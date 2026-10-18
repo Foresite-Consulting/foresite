@@ -174,4 +174,6 @@ Computed per model × venue × metric over **scored** forecasts: the model gave 
 | Evaluable week    | Complete week with ≥ 7 matched forecasts, ≥ 90% of the baseline's scored forecasts matched, and actuals summing to more than 0                |
 | Worse week        | Challenger WAPE > baseline WAPE (a tie is not worse)                                                                                          |
 | Rollback          | Last 4 complete weeks all evaluable and worse → serve the baseline and raise a `forecast_rollback` alert. Any evaluable not-worse week → keep |
+| Standing rollback | Once rolled back, a challenger id + version stays on the baseline in later checks (state file, `evaluate --state`) until a person passes the Phase 2 gate again (`--reinstate`) |
+| Alert id          | Hash of venue, metric, challenger id + version and the trigger week, so one rollback event keeps one id across re-runs and later weeks                 |
 | Phase 2 gate      | On the hold-out weeks (default last 8): all evaluable, pooled WAPE strictly lower, and better in at least ⌈0.75 × weeks⌉ weeks (6 of 8)       |

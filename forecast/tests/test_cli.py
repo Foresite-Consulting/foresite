@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 import pytest
@@ -237,6 +238,120 @@ def test_locked_log_exits_2(
     assert not log.exists()
 
 
+def test_evaluate_state_keeps_a_rollback_and_reinstates_only_on_a_gate_pass(
+    files: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    common = [
+        "--baseline",
+        str(files / "baseline_log.csv"),
+        "--actuals",
+        str(files / "synthetic_actuals.csv"),
+    ]
+    degrading = tmp_path / "degrading.csv"
+    good = tmp_path / "good.csv"
+    for target, extra in ((degrading, ["--degrade-from", "2025-05-05"]), (good, [])):
+        code, _, _ = run(
+            capsys,
+            "synthetic-challenger",
+            "--baseline-log",
+            str(files / "baseline_log.csv"),
+            "--actuals",
+            str(files / "synthetic_actuals.csv"),
+            "--quality",
+            "good",
+            *extra,
+            "--out",
+            str(target),
+        )
+        assert code == 0
+    state = tmp_path / "state.json"
+
+    def evaluate(challenger: Path, day: str, *extra: str) -> dict[str, Any]:
+        code, out, err = run(
+            capsys,
+            "evaluate",
+            "--challenger",
+            str(challenger),
+            *common,
+            "--evaluation-day",
+            day,
+            "--state",
+            str(state),
+            "--json",
+            *extra,
+        )
+        assert code == 0, err
+        payload: dict[str, Any] = json.loads(out)
+        return payload
+
+    first = evaluate(degrading, "2025-06-01")["rollback"][0]
+    assert first["decision"] == "rollback_to_baseline"
+    assert first["alert"]["new"] is True
+    later = evaluate(degrading, "2025-06-29")["rollback"][0]
+    assert later["decision"] == "rollback_to_baseline"
+    assert later["alert"]["alert_id"] == first["alert"]["alert_id"]
+    assert later["alert"]["new"] is False
+    saved = json.loads(state.read_text())
+    (record,) = saved["rollbacks"]
+    assert record["status"] == "active"
+    assert [c["week_start"] for c in record["checks"]] == ["2025-05-26", "2025-06-23"]
+
+    # --reinstate with a failing gate leaves the rollback in force.
+    payload = evaluate(degrading, "2025-06-29", "--reinstate", "--training-end", "2025-04-01")
+    assert payload["gate"][0]["status"] == "fail"
+    assert payload["reinstate"][0].startswith("Not reinstated")
+    assert payload["rollback"][0]["serve_model_id"] == "baseline-swly-trend"
+    code, out, _ = run(
+        capsys,
+        "evaluate",
+        "--challenger",
+        str(degrading),
+        *common,
+        "--evaluation-day",
+        "2025-06-29",
+        "--state",
+        str(state),
+        "--reinstate",
+        "--training-end",
+        "2025-04-01",
+    )
+    assert code == 0
+    assert out.startswith("Not reinstated for SYNTH-VENUE-1")
+
+    # A good challenger that was rolled back earlier: held on the baseline until reinstated.
+    good_record = {
+        **record,
+        "challenger_model_id": "synthetic-good-challenger",
+        "alert_id": "feedfacefeedface",
+    }
+    state.write_text(json.dumps({**saved, "rollbacks": [record, good_record]}))
+    held = evaluate(good, "2025-06-29")["rollback"][0]
+    assert (held["decision"], held["weekly_verdict"]) == ("rollback_to_baseline", "keep")
+    code, out, _ = run(
+        capsys,
+        "evaluate",
+        "--challenger",
+        str(good),
+        *common,
+        "--evaluation-day",
+        "2025-06-29",
+        "--state",
+        str(state),
+    )
+    assert code == 0
+    assert "ALERT (still standing) feedfacefeedface" in out
+    assert "re-runs the Phase 2 gate" in out
+    assert f"Updated rollback state {state}." in out
+    payload = evaluate(good, "2025-06-29", "--reinstate", "--training-end", "2025-04-01")
+    assert payload["reinstate"] == [
+        "Reinstated synthetic-good-challenger synthetic for SYNTH-VENUE-1 "
+        "net_sales_ex_gst_cents: Phase 2 gate passed."
+    ]
+    assert payload["rollback"][0]["decision"] == "keep"
+    statuses = [r["status"] for r in json.loads(state.read_text())["rollbacks"]]
+    assert statuses == ["active", "reinstated"]
+
+
 def test_evaluate_rollback_scenario(
     files: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -440,6 +555,48 @@ def test_evaluate_rollback_scenario(
                 "{d}/baseline_log.csv",
             ],
             "would overwrite an input file",
+        ),
+        (
+            [
+                "evaluate",
+                "--challenger",
+                "{d}/baseline_log.csv",
+                "--baseline",
+                "{d}/baseline_log.csv",
+                "--actuals",
+                "{d}/synthetic_actuals.csv",
+                "--state",
+                "{d}/synthetic_actuals.csv",
+            ],
+            "would overwrite an input file",
+        ),
+        (
+            [
+                "evaluate",
+                "--challenger",
+                "{d}/baseline_log.csv",
+                "--baseline",
+                "{d}/baseline_log.csv",
+                "--actuals",
+                "{d}/synthetic_actuals.csv",
+                "--reinstate",
+            ],
+            "--reinstate needs --state",
+        ),
+        (
+            [
+                "evaluate",
+                "--challenger",
+                "{d}/baseline_log.csv",
+                "--baseline",
+                "{d}/baseline_log.csv",
+                "--actuals",
+                "{d}/synthetic_actuals.csv",
+                "--reinstate",
+                "--state",
+                "{t}/state.json",
+            ],
+            "--reinstate needs --training-end",
         ),
     ],
 )

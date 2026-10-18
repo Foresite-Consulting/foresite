@@ -20,6 +20,7 @@ import json
 import sys
 from collections import Counter
 from collections.abc import Sequence
+from contextlib import nullcontext
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -38,7 +39,13 @@ from foresite_forecast.accuracy import (
     write_forecast_log,
 )
 from foresite_forecast.baseline import BaselineModel
-from foresite_forecast.csvio import LogLockedError, atomic_text_writer, parse_iso_date, write_csv
+from foresite_forecast.csvio import (
+    LogLockedError,
+    atomic_text_writer,
+    exclusive_lock,
+    parse_iso_date,
+    write_csv,
+)
 from foresite_forecast.errors import DataValidationError
 from foresite_forecast.model import MAX_HORIZON_DAYS
 from foresite_forecast.schema import (
@@ -54,6 +61,11 @@ from foresite_forecast.selection import (
     beats_baseline,
     decide_rollback,
     format_day,
+    model_identity,
+    read_rollback_state,
+    reinstate,
+    updated_state,
+    write_rollback_state,
 )
 from foresite_forecast.synthetic import calendar_rows, generate_synthetic, synthetic_challenger
 
@@ -250,15 +262,19 @@ def _cmd_accuracy(args: argparse.Namespace) -> int:
 
 
 def _cmd_evaluate(args: argparse.Namespace) -> int:
+    inputs = (args.actuals, args.challenger, args.baseline)
     if args.alerts_out is not None:
-        _distinct_output(args.alerts_out, args.actuals, args.challenger, args.baseline)
+        _distinct_output(args.alerts_out, *inputs, args.state)
+    if args.state is not None:
+        _distinct_output(args.state, *inputs)
+    if args.reinstate and args.state is None:
+        raise CliError("--reinstate needs --state (the rollback state file to update)")
+    if args.reinstate and args.training_end is None:
+        raise CliError("--reinstate needs --training-end: reinstating is a fresh Phase 2 gate pass")
     actuals = read_daily_actuals(_existing(args.actuals, "actuals"))
     challenger = forecasts_to_frame(read_forecast_log(_existing(args.challenger, "challenger log")))
     baseline = forecasts_to_frame(read_forecast_log(_existing(args.baseline, "baseline log")))
     selection = SelectionConfig()
-    decisions = decide_rollback(
-        challenger, baseline, actuals, evaluation_day=args.evaluation_day, config=selection
-    )
     gates = beats_baseline(
         challenger,
         baseline,
@@ -268,6 +284,28 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
         evaluation_day=args.evaluation_day,
         config=GateConfig(selection=selection),
     )
+    with exclusive_lock(args.state) if args.state is not None else nullcontext():
+        state = read_rollback_state(args.state) if args.state is not None else []
+        notes: list[str] = []
+        if args.reinstate:
+            challenger_id, version = model_identity(challenger)
+            state, notes = reinstate(
+                state,
+                gates,
+                challenger_model_id=challenger_id,
+                challenger_model_version=version,
+                on=args.evaluation_day or actuals.last_day(),
+            )
+        decisions = decide_rollback(
+            challenger,
+            baseline,
+            actuals,
+            evaluation_day=args.evaluation_day,
+            config=selection,
+            state=state,
+        )
+        if args.state is not None:
+            write_rollback_state(args.state, updated_state(state, decisions))
     alerts = [d.alert for d in decisions if d.alert is not None]
     if args.alerts_out is not None:
         with atomic_text_writer(args.alerts_out) as handle:
@@ -277,21 +315,29 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
         payload = {
             "rollback": [d.as_dict() for d in decisions],
             "gate": [g.as_dict() for g in gates],
+            "reinstate": notes,
         }
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
+    for note in notes:
+        print(note)
     for d in decisions:
         print(f"Rollback check {d.venue_id} {d.metric}: {d.decision} (serve {d.serve_model_id})")
+        if d.weekly_verdict != d.decision:
+            print(f"  {d.reasons[0]}")
         for w in d.weeks:
             print(f"  week of {format_day(w.week_start)}: {w.verdict} - {w.note}")
         if d.alert is not None:
-            print(f"  ALERT {d.alert.alert_id}: {d.alert.message}")
+            label = "ALERT" if d.alert.new else "ALERT (still standing)"
+            print(f"  {label} {d.alert.alert_id}: {d.alert.message}")
     for g in gates:
         print(f"Phase 2 gate {g.venue_id} {g.metric}: {g.status}")
         for reason in g.reasons:
             print(f"  {reason}")
     if args.alerts_out is not None:
         print(f"Wrote {len(alerts)} alert(s) to {args.alerts_out}.")
+    if args.state is not None:
+        print(f"Updated rollback state {args.state}.")
     return 0
 
 
@@ -378,6 +424,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--holdout-weeks", type=int, default=GateConfig().holdout_weeks)
     p.add_argument("--training-end", type=_date, help="challenger's last training day")
     p.add_argument("--alerts-out", type=Path, help="write rollback alerts as JSON lines")
+    p.add_argument(
+        "--state",
+        type=Path,
+        help="rollback state JSON to read and update (keeps a rollback in force across weeks)",
+    )
+    p.add_argument(
+        "--reinstate",
+        action="store_true",
+        help="put a rolled-back challenger back live where the Phase 2 gate passes (needs --state)",
+    )
     p.add_argument("--json", action="store_true", help="print JSON instead of text")
     p.set_defaults(func=_cmd_evaluate)
 

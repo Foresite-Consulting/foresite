@@ -6,6 +6,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Literal, get_args
 
 import polars as pl
@@ -15,13 +16,20 @@ from foresite_forecast.accuracy import forecasts_to_frame
 from foresite_forecast.schema import DailyActuals
 from foresite_forecast.selection import (
     GateConfig,
+    RollbackCheck,
+    RollbackRecord,
     SelectionConfig,
     WeekComparison,
     beats_baseline,
     decide_rollback,
     format_day,
     latest_complete_week_start,
+    model_identity,
+    read_rollback_state,
+    reinstate,
     rollback_verdict,
+    updated_state,
+    write_rollback_state,
 )
 from tests.helpers import VENUE, build_actuals, make_forecast
 
@@ -163,6 +171,187 @@ def test_logs_must_each_hold_one_model() -> None:
         decide_rollback(s.challenger.clear(), s.baseline, s.actuals)
     with pytest.raises(ValueError, match="same model"):
         decide_rollback(s.baseline, s.baseline, s.actuals)
+
+
+# -- one-way rollback (persisted state) and alert de-duplication ----------------------
+
+
+def week_end(i: int) -> date:
+    """The Sunday ending week ``i`` (0-based) of a scenario."""
+    return FIRST_MONDAY + timedelta(days=7 * i + 6)
+
+
+def test_keep_after_a_prior_rollback_does_not_switch_back() -> None:
+    s = scenario(["worse"] * 4 + ["better"] * 4)
+    (first,) = decide_rollback(s.challenger, s.baseline, s.actuals, evaluation_day=week_end(3))
+    assert first.decision == "rollback_to_baseline"
+    assert first.record is not None
+    assert first.alert is not None
+    assert first.alert.new
+    state = updated_state([], [first])
+    assert state == [first.record]
+    # Four good weeks later the weekly rule alone says keep, but the rollback stands.
+    (later,) = decide_rollback(
+        s.challenger, s.baseline, s.actuals, evaluation_day=week_end(7), state=state
+    )
+    stateless = decide_rollback(s.challenger, s.baseline, s.actuals, evaluation_day=week_end(7))
+    assert stateless[0].decision == "keep"
+    assert later.weekly_verdict == "keep"
+    assert later.decision == "rollback_to_baseline"
+    assert later.serve_model_id == "baseline-swly-trend"
+    assert later.alert is not None
+    assert later.alert.alert_id == first.alert.alert_id
+    assert not later.alert.new
+    assert "Phase 2 gate" in later.reasons[0]
+    assert "--reinstate" in later.reasons[0]
+    assert later.record is not None
+    assert [c.verdict for c in later.record.checks] == ["rollback_to_baseline", "keep"]
+    state = updated_state(state, [later])
+    assert len(state) == 1
+    # Re-running the same week replaces that week's check rather than adding another.
+    (again,) = decide_rollback(
+        s.challenger, s.baseline, s.actuals, evaluation_day=week_end(7), state=state
+    )
+    assert again.record is not None
+    assert len(again.record.checks) == 2
+    payload = json.loads(json.dumps(later.as_dict()))
+    assert payload["rollback_record"]["status"] == "active"
+    assert payload["weekly_verdict"] == "keep"
+
+
+def test_alert_id_is_stable_across_reruns_and_later_weeks() -> None:
+    s = scenario(["better"] + ["worse"] * 7)
+    ids = []
+    for i in range(4, 8):  # first triggered at the end of week 4, still worse to week 7
+        (d,) = decide_rollback(s.challenger, s.baseline, s.actuals, evaluation_day=week_end(i))
+        assert d.decision == "rollback_to_baseline"
+        assert d.alert is not None
+        assert d.alert.trigger_week_start == FIRST_MONDAY + timedelta(weeks=4)
+        ids.append(d.alert.alert_id)
+    assert len(set(ids)) == 1  # stateless: still one alert for one rollback event
+    # With state, later weeks keep the recorded id and are not new alerts.
+    (d,) = decide_rollback(s.challenger, s.baseline, s.actuals, evaluation_day=week_end(4))
+    state = updated_state([], [d])
+    for i in range(5, 8):
+        (d,) = decide_rollback(
+            s.challenger, s.baseline, s.actuals, evaluation_day=week_end(i), state=state
+        )
+        assert d.alert is not None
+        assert (d.alert.alert_id, d.alert.new) == (ids[0], False)
+        state = updated_state(state, [d])
+    assert len(state) == 1
+    assert [c.week_start for c in state[0].checks] == [
+        FIRST_MONDAY + timedelta(weeks=i) for i in range(4, 8)
+    ]
+
+
+def test_a_new_rollback_event_or_version_gets_a_new_alert_id() -> None:
+    first = scenario(["worse"] * 4)
+    (a,) = decide_rollback(first.challenger, first.baseline, first.actuals)
+    broken = scenario(["worse"] * 4 + ["better"] + ["worse"] * 4)
+    (b,) = decide_rollback(broken.challenger, broken.baseline, broken.actuals)
+    assert a.alert is not None
+    assert b.alert is not None
+    assert b.alert.trigger_week_start == FIRST_MONDAY + timedelta(weeks=8)
+    assert a.alert.alert_id != b.alert.alert_id
+    v2 = first.challenger.with_columns(model_version=pl.lit("2"))
+    (c,) = decide_rollback(v2, first.baseline, first.actuals, state=updated_state([], [a]))
+    assert c.alert is not None
+    assert c.alert.new  # a new version is a new challenger: the old record does not apply
+    assert c.alert.alert_id != a.alert.alert_id
+    assert model_identity(v2) == ("challenger-x", "2")
+
+
+def test_reinstate_needs_a_passing_gate() -> None:
+    s = scenario(["worse"] * 4 + ["better"] * 8)
+    (rolled,) = decide_rollback(s.challenger, s.baseline, s.actuals, evaluation_day=week_end(3))
+    state = updated_state([], [rolled])
+    other = RollbackRecord("SYNTH-V2", "covers", "other-model", "9", "b", "abc", FIRST_MONDAY)
+    state = [*state, other]
+    (failing,) = beats_baseline(s.challenger, s.baseline, s.actuals, evaluation_day=week_end(7))
+    assert not failing.passed
+    kept, notes = reinstate(
+        state,
+        [failing],
+        challenger_model_id="challenger-x",
+        challenger_model_version="1",
+        on=week_end(7),
+    )
+    assert kept == state
+    assert notes == [
+        f"Not reinstated for {VENUE} net_sales_ex_gst_cents: Phase 2 gate fail; "
+        "still serving the baseline."
+    ]
+    _, notes = reinstate(
+        state, [], challenger_model_id="challenger-x", challenger_model_version="1", on=FIRST_MONDAY
+    )
+    assert "Phase 2 gate not run" in notes[0]
+    (passing,) = beats_baseline(s.challenger, s.baseline, s.actuals)
+    assert passing.passed
+    new_state, notes = reinstate(
+        state,
+        [passing],
+        challenger_model_id="challenger-x",
+        challenger_model_version="1",
+        on=week_end(11),
+    )
+    assert notes[0].startswith("Reinstated challenger-x 1 for SYNTH-V")
+    assert new_state[0].status == "reinstated"
+    assert new_state[0].reinstated_on == week_end(11)
+    assert new_state[1] == other  # other challengers untouched
+    (d,) = decide_rollback(s.challenger, s.baseline, s.actuals, state=new_state)
+    assert d.decision == "keep"
+    assert d.serve_model_id == "challenger-x"
+    assert updated_state(new_state, [d]) == new_state
+
+
+def test_state_file_round_trip_and_validation(tmp_path: Path) -> None:
+    path = tmp_path / "state.json"
+    assert read_rollback_state(path) == []  # no file yet: empty state
+    record = RollbackRecord(
+        VENUE,
+        "net_sales_ex_gst_cents",
+        "challenger-x",
+        "1.0.0+cfg.ab",
+        "baseline-swly-trend",
+        "0123456789abcdef",
+        FIRST_MONDAY,
+        "reinstated",
+        (RollbackCheck(FIRST_MONDAY, "rollback_to_baseline"),),
+        FIRST_MONDAY + timedelta(days=30),
+    )
+    write_rollback_state(path, [record])
+    assert read_rollback_state(path) == [record]
+    assert [p.name for p in tmp_path.iterdir()] == ["state.json"]
+    good = json.loads(path.read_text())
+    entry = good["rollbacks"][0]
+    bad_cases: list[tuple[object, str]] = [
+        ("not json", "not valid JSON"),
+        ([], "expected a foresite-rollback-state version 1"),
+        ({**good, "version": 2}, "version 1"),
+        ({**good, "rollbacks": {}}, "rollbacks must be a list"),
+        ({**good, "rollbacks": [1]}, "must be an object"),
+        ({**good, "rollbacks": [{**entry, "alert_id": ""}]}, "alert_id must be a non-empty"),
+        ({**good, "rollbacks": [{**entry, "venue_id": "=bad"}]}, "not a valid identifier"),
+        ({**good, "rollbacks": [{**entry, "status": "paused"}]}, "status must be"),
+        ({**good, "rollbacks": [{**entry, "checks": {}}]}, "checks must be a list"),
+        ({**good, "rollbacks": [{**entry, "checks": [1]}]}, "entries must be objects"),
+        (
+            {**good, "rollbacks": [{**entry, "checks": [{"week_start": "2026-01-05"}]}]},
+            "not a known decision",
+        ),
+        ({**good, "rollbacks": [{**entry, "trigger_week_start": "5 Jan"}]}, "YYYY-MM-DD"),
+        ({**good, "rollbacks": [{**entry, "reinstated_on": 5}]}, "reinstated_on must be a date"),
+    ]
+    for payload, message in bad_cases:
+        path.write_text(payload if isinstance(payload, str) else json.dumps(payload))
+        with pytest.raises(ValueError, match=message):
+            read_rollback_state(path)
+    minimal = {k: v for k, v in entry.items() if k not in ("checks", "reinstated_on")}
+    path.write_text(json.dumps({**good, "rollbacks": [minimal]}))
+    (loaded,) = read_rollback_state(path)
+    assert loaded.checks == ()
+    assert loaded.reinstated_on is None
 
 
 def week(verdict: Literal["worse", "not_worse", "insufficient"]) -> WeekComparison:

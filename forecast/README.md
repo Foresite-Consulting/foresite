@@ -67,8 +67,15 @@ uv run python -m foresite_forecast synthetic-challenger --baseline-log /tmp/fs/b
 uv run python -m foresite_forecast evaluate --challenger /tmp/fs/challenger.csv \
   --baseline /tmp/fs/baseline_log.csv --actuals /tmp/fs/synthetic_actuals.csv \
   [--evaluation-day 2026-10-18] [--holdout-weeks 8] [--training-end 2026-08-01] \
-  [--alerts-out /tmp/fs/alerts.jsonl] [--json]
+  [--alerts-out /tmp/fs/alerts.jsonl] [--state /tmp/fs/rollback_state.json] [--json]
+
+# After a rollback: put the challenger back live only if the Phase 2 gate passes now
+uv run python -m foresite_forecast evaluate --challenger /tmp/fs/challenger.csv \
+  --baseline /tmp/fs/baseline_log.csv --actuals /tmp/fs/synthetic_actuals.csv \
+  --state /tmp/fs/rollback_state.json --reinstate --training-end 2026-08-01
 ```
+
+**Rollback is one-way.** Run the weekly `evaluate` with `--state`: once a challenger has been rolled back, later runs keep serving the baseline (and say so) even when a week looks good again. To go back, a person re-runs `evaluate` with `--reinstate`; the challenger is put back only where the Phase 2 gate passes in that run.
 
 `baseline` also prints the accuracy-to-date line for each section: from the live log if `--log` holds enough history, otherwise from a backtest of the last 10 weeks, labelled as such.
 
@@ -95,7 +102,9 @@ Each series must be contiguous from its first to its last day: a day without dat
 
 **Forecasts / forecast log** (output of `baseline` and `backtest`, input of `accuracy` and `evaluate`): `issued_at` (ISO 8601 with offset, written in UTC with `Z`), `model_id`, `model_version`, `venue_id`, `section_id`, `metric`, `as_of`, `target_day`, `horizon_days` (1-28), `point`, `low`, `high` (blank for `unforecastable`), `rule`, then optional provenance columns `interval_rule`, `interval_n`, `trend_factor`, `trend_rule`, `reference_days` (`;`-separated). Every row is re-checked on read (`0 ≤ low ≤ point ≤ high`, horizon matches the dates, provenance set). `--log` appends. **One writer per log** until the Postgres table replaces the CSV: an append holds an advisory lock on `<log>.lock` (`fcntl.flock`, Linux/macOS) for its whole read-modify-write, and a second writer at the same time stops with exit code 2 and "only one writer per log at a time" rather than losing rows. The `.lock` file stays next to the log; that is expected. Every output file is written atomically (temporary file, `fsync`, rename, folder `fsync`). Input files over 100 MB are refused before they are read. The latest issue of the same target and horizon wins when scoring, even if it is `unforecastable` (which retires the earlier point).
 
-**Alerts** (output of `evaluate --alerts-out`): one JSON object per line with `alert_id`, `kind` (`forecast_rollback`), `severity`, `venue_id`, `metric`, model ids, the four weeks with both WAPEs, and a plain-English `message`. No personal data.
+**Alerts** (output of `evaluate --alerts-out`): one JSON object per line with `alert_id`, `kind` (`forecast_rollback`), `severity`, `venue_id`, `metric`, model ids and challenger version, `trigger_week_start`, `new`, the four weeks with both WAPEs, and a plain-English `message`. No personal data. `alert_id` stays the same for one rollback event (re-runs and later weeks), so de-duplicate on it; `new` is true only on the run that started the rollback.
+
+**Rollback state** (`evaluate --state`, read and rewritten atomically): JSON `{"schema": "foresite-rollback-state", "version": 1, "rollbacks": [...]}`, one record per rollback event with `venue_id`, `metric`, `challenger_model_id`, `challenger_model_version`, `baseline_model_id`, `alert_id`, `trigger_week_start`, `status` (`active` or `reinstated`), `checks` (one `{week_start, verdict}` per weekly run) and `reinstated_on`. A missing file is an empty state.
 
 ## Backtest on SYNTHETIC data
 
