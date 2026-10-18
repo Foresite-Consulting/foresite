@@ -103,17 +103,25 @@ function mapReport(
   }
 
   const seen = new Set<number>();
+  const entryPoints = new Set<string>();
   for (const [lineIndex, line] of lines.entries()) {
     if (seen.has(line.line)) {
       return fail('duplicate_line', [`${prefix}.line_periodic_data.${lineIndex}.line`]);
     }
     seen.add(line.line);
     const sourceLine = String(line.line);
+    const entryPointId = resolveEntryPointId(input.device, sourceLine);
+    // Readings are unique per entry point and interval, so a second line on
+    // the same entry point would silently overwrite the first one's counts.
+    if (entryPoints.has(entryPointId)) {
+      return fail('duplicate_entry_point', [`${prefix}.line_periodic_data.${lineIndex}.line`]);
+    }
+    entryPoints.add(entryPointId);
     readings.push({
       provider: MILESIGHT_PROVIDER,
       deviceId: input.device.deviceId,
       venueId: input.device.venueId,
-      entryPointId: resolveEntryPointId(input.device, sourceLine),
+      entryPointId,
       sourceLine,
       intervalStart: toUtcIso(startMs),
       intervalEnd: toUtcIso(endMs),

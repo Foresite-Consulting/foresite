@@ -143,8 +143,12 @@ describe('Milesight reports that are not readings', () => {
 });
 
 describe('Milesight payload validation', () => {
-  const expectCode = (body: unknown, code: string) => {
-    const outcome = map(body);
+  const expectCode = (
+    body: unknown,
+    code: string,
+    overrides: Partial<CounterDeviceContext> = {},
+  ) => {
+    const outcome = map(body, overrides);
     expect(outcome.ok).toBe(false);
     if (!outcome.ok) expect(outcome.code).toBe(code);
     return outcome;
@@ -220,6 +224,21 @@ describe('Milesight payload validation', () => {
     const body = clone(twoLines);
     body.line_periodic_data[1]!.line = 1;
     expectCode(body, 'duplicate_line');
+  });
+
+  it('rejects two lines that resolve to the same entry point instead of overwriting counts', () => {
+    // Review F1: line 2 mapped onto the device's own entry point (line 1's).
+    expectCode(twoLines, 'duplicate_entry_point', { lineEntryPoints: { '2': 'front-door' } });
+    // Two explicit mappings onto one entry point.
+    expectCode(twoLines, 'duplicate_entry_point', {
+      lineEntryPoints: { '1': 'side', '2': 'side' },
+    });
+    // An explicit mapping that collides with another line's automatic id.
+    const body = clone(twoLines);
+    body.line_periodic_data[1]!.line = 3;
+    expectCode(body, 'duplicate_entry_point', { lineEntryPoints: { '1': 'front-door:line-3' } });
+    // Distinct mappings are fine.
+    expect(map(twoLines, { lineEntryPoints: { '2': 'side' } }).ok).toBe(true);
   });
 });
 

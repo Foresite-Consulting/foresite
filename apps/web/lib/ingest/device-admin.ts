@@ -69,7 +69,9 @@ export function parseDeviceArgs(args: string[]): DeviceCommand {
         if (!match?.[1] || !match[2] || !SHORT_ID.test(match[2])) {
           throw new UsageError('--line needs <line number>=<entry id>');
         }
-        lines[String(Number(match[1]))] = match[2];
+        const line = String(Number(match[1]));
+        if (lines[line] !== undefined) throw new UsageError(`--line ${line} is given twice`);
+        lines[line] = match[2];
         break;
       }
       case '--rotate':
@@ -102,6 +104,7 @@ export function parseDeviceArgs(args: string[]): DeviceCommand {
   if (entryPointId === undefined || !SHORT_ID.test(entryPointId)) {
     throw new UsageError('--entry is required');
   }
+  checkLineEntryPoints(entryPointId, lines);
   if (!PROVIDER.test(provider)) throw new UsageError('--provider is not valid');
   if (serial !== null && !SERIAL.test(serial)) throw new UsageError('--serial is not valid');
   return {
@@ -114,6 +117,32 @@ export function parseDeviceArgs(args: string[]): DeviceCommand {
     lineEntryPoints: lines,
     memoryJson,
   };
+}
+
+/**
+ * Every line must land on its own entry point. Readings are unique per
+ * (device, entry point, interval), so two lines on one entry point would
+ * overwrite each other's counts (review F1). The ingest adapter refuses such
+ * reports too (`duplicate_entry_point`); this catches it at registration.
+ */
+function checkLineEntryPoints(entryPointId: string, lines: Record<string, string>): void {
+  const seen = new Map<string, string>();
+  for (const [line, entry] of Object.entries(lines)) {
+    if (entry === entryPointId) {
+      throw new UsageError(
+        `--line ${line}=${entry} is the device's own entry point (--entry), which line 1 uses`,
+      );
+    }
+    // `<entry>:line-<n>` is the automatic id for unmapped lines.
+    if (entry.startsWith(`${entryPointId}:line-`)) {
+      throw new UsageError(`--line ${line}=${entry} uses an id reserved for unmapped lines`);
+    }
+    const other = seen.get(entry);
+    if (other !== undefined) {
+      throw new UsageError(`--line ${other} and --line ${line} map to the same entry point`);
+    }
+    seen.set(entry, line);
+  }
 }
 
 /** Single-quoted SQL literal. Inputs are already validated; quoting is belt and braces. */

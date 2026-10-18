@@ -198,6 +198,27 @@ describe('POST /api/ingest/counters/[provider]: happy path', () => {
     ]);
   });
 
+  it('refuses with 400 a report whose lines land on one entry point, storing nothing (review F1)', async () => {
+    // Line 2 mapped onto the device's own entry point, which line 1 uses.
+    const clash = setup({}, [device({ lineEntryPoints: { '2': 'front' } })]);
+    const response = await post(clash, {
+      body: milesightPeriodic({
+        start: intervalStart(0),
+        lines: [
+          { line: 1, in: 3, out: 1 },
+          { line: 2, in: 4, out: 0 },
+        ],
+      }),
+    });
+    expect(response.status).toBe(400);
+    expect(await json(response)).toEqual({ error: 'duplicate_entry_point' });
+    expect(await clash.repo.listReadings('door-01')).toEqual([]);
+    const events = await clash.repo.listEvents('door-01');
+    expect(events.map((e) => [e.type, e.detail.error_code])).toEqual([
+      ['payload_rejected', 'duplicate_entry_point'],
+    ]);
+  });
+
   it('accepts trigger reports without turning them into readings', async () => {
     const response = await post(s, {
       body: {

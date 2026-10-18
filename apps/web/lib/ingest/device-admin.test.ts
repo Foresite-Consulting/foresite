@@ -73,6 +73,32 @@ describe('parseDeviceArgs', () => {
     }
   });
 
+  it('refuses line mappings that would put two lines on one entry point', () => {
+    const base = ['--device', 'ok-device', '--venue', 'v', '--entry', 'front'];
+    for (const extra of [
+      ['--line', '2=front'],
+      ['--line', '2=side', '--line', '3=side'],
+      ['--line', '2=side', '--line', '2=back'],
+      ['--line', '1=front:line-2'],
+    ]) {
+      expect(() => parseDeviceArgs([...base, ...extra]), extra.join(' ')).toThrow(UsageError);
+    }
+    // --entry given after --line is still checked.
+    expect(() =>
+      parseDeviceArgs([
+        '--line',
+        '2=front',
+        '--device',
+        'ok-device',
+        '--venue',
+        'v',
+        '--entry',
+        'front',
+      ]),
+    ).toThrow(/own entry point/);
+    expect(parseDeviceArgs([...base, '--line', '2=side', '--line', '3=back']).kind).toBe('create');
+  });
+
   it('doubles quotes in SQL literals', () => {
     expect(sqlLiteral("o'clock")).toBe("'o''clock'");
   });

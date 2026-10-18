@@ -86,6 +86,8 @@ export type CounterPayloadErrorCode =
   | 'invalid_timestamp'
   | 'invalid_interval'
   | 'duplicate_line'
+  /** Two lines in one report resolve to the same entry point (would overwrite counts). */
+  | 'duplicate_entry_point'
   | 'too_many_reports';
 
 export type CounterMapOutcome =
