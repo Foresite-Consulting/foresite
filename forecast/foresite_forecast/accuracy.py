@@ -32,6 +32,9 @@ interval_n         number of past errors behind the range (optional)
 trend_factor       baseline trend factor (optional)
 trend_rule         provenance of the trend factor (optional)
 reference_days     ``;``-separated days the point was built from (optional)
+training_end       last day of the model's training data, ``<= as_of``
+                   (optional; blank for the baseline, which is not trained;
+                   required on challenger rows for ``evaluate --sign-off``)
 =================  ========================================================
 
 Metric definitions (for scored rows: forecastable, actual known, day open):
@@ -97,6 +100,7 @@ LOG_OPTIONAL: tuple[str, ...] = (
     "trend_factor",
     "trend_rule",
     "reference_days",
+    "training_end",
 )
 LOG_COLUMNS: tuple[str, ...] = LOG_REQUIRED + LOG_OPTIONAL
 
@@ -119,6 +123,7 @@ LOG_SCHEMA: dict[str, pl.DataType] = {
     "trend_factor": pl.Float64(),
     "trend_rule": pl.String(),
     "reference_days": pl.String(),
+    "training_end": pl.Date(),
 }
 
 #: Columns that identify one forecast target at one horizon for one model.
@@ -161,6 +166,7 @@ def _forecast_row(f: Forecast) -> tuple[object, ...]:
         None if f.trend_factor is None else repr(f.trend_factor),
         f.trend_rule,
         ";".join(d.isoformat() for d in f.reference_days) or None,
+        f.training_end,
     )
 
 
@@ -186,6 +192,7 @@ def forecasts_to_frame(forecasts: Iterable[Forecast]) -> pl.DataFrame:
             f.trend_factor,
             f.trend_rule,
             ";".join(d.isoformat() for d in f.reference_days) or None,
+            f.training_end,
         )
         for f in forecasts
     ]
@@ -228,6 +235,7 @@ def frame_to_forecasts(frame: pl.DataFrame) -> list[Forecast]:
                 trend_factor=_optional(row, "trend_factor", float),
                 trend_rule=_optional(row, "trend_rule", str),
                 reference_days=tuple(date.fromisoformat(d) for d in refs.split(";") if d),
+                training_end=_optional(row, "training_end", date),
             )
         )
     return out
@@ -315,6 +323,10 @@ def _row_to_forecast(row: CsvRow, issues: list[ValidationIssue]) -> Forecast | N
             bad(column, "must be a real date written YYYY-MM-DD")
         else:
             days[column] = parsed
+    training_end_raw = f.get("training_end")
+    training_end = parse_iso_date(training_end_raw) if training_end_raw is not None else None
+    if training_end_raw is not None and training_end is None:
+        bad("training_end", "must be blank or a real date written YYYY-MM-DD")
     ints: dict[str, int | None] = {}
     for column in ("horizon_days", "point", "low", "high", "interval_n"):
         parsed_int = _parse_int(f.get(column))
@@ -363,6 +375,7 @@ def _row_to_forecast(row: CsvRow, issues: list[ValidationIssue]) -> Forecast | N
             trend_factor=trend if trend is not False else None,
             trend_rule=f.get("trend_rule"),
             reference_days=tuple(refs),
+            training_end=training_end,
         )
     except ValueError as exc:
         issues.append(ValidationIssue(str(exc), line=row.line))

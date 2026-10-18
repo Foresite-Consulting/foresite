@@ -42,6 +42,22 @@ def files(tmp_path_factory: pytest.TempPathFactory) -> Path:
         )
         == 0
     )
+    assert (
+        main(
+            [
+                "synthetic-challenger",
+                "--baseline-log",
+                str(d / "baseline_log.csv"),
+                "--actuals",
+                str(d / "synthetic_actuals.csv"),
+                "--quality",
+                "good",
+                "--out",
+                str(d / "challenger_no_training_end.csv"),
+            ]
+        )
+        == 0
+    )
     return d
 
 
@@ -259,6 +275,8 @@ def test_evaluate_state_keeps_a_rollback_and_reinstates_only_on_a_gate_pass(
             str(files / "synthetic_actuals.csv"),
             "--quality",
             "good",
+            "--training-end",
+            "2025-04-01",
             *extra,
             "--out",
             str(target),
@@ -297,7 +315,7 @@ def test_evaluate_state_keeps_a_rollback_and_reinstates_only_on_a_gate_pass(
     assert [c["week_start"] for c in record["checks"]] == ["2025-05-26", "2025-06-23"]
 
     # --reinstate with a failing gate leaves the rollback in force.
-    payload = evaluate(degrading, "2025-06-29", "--reinstate", "--training-end", "2025-04-01")
+    payload = evaluate(degrading, "2025-06-29", "--reinstate", "--sign-off")
     assert payload["gate"][0]["status"] == "fail"
     assert payload["reinstate"][0].startswith("Not reinstated")
     assert payload["rollback"][0]["serve_model_id"] == "baseline-swly-trend"
@@ -312,8 +330,7 @@ def test_evaluate_state_keeps_a_rollback_and_reinstates_only_on_a_gate_pass(
         "--state",
         str(state),
         "--reinstate",
-        "--training-end",
-        "2025-04-01",
+        "--sign-off",
     )
     assert code == 0
     assert out.startswith("Not reinstated for SYNTH-VENUE-1")
@@ -342,7 +359,7 @@ def test_evaluate_state_keeps_a_rollback_and_reinstates_only_on_a_gate_pass(
     assert "ALERT (still standing) feedfacefeedface" in out
     assert "re-runs the Phase 2 gate" in out
     assert f"Updated rollback state {state}." in out
-    payload = evaluate(good, "2025-06-29", "--reinstate", "--training-end", "2025-04-01")
+    payload = evaluate(good, "2025-06-29", "--reinstate", "--sign-off")
     assert payload["reinstate"] == [
         "Reinstated synthetic-good-challenger synthetic for SYNTH-VENUE-1 "
         "net_sales_ex_gst_cents: Phase 2 gate passed."
@@ -596,7 +613,20 @@ def test_evaluate_rollback_scenario(
                 "--state",
                 "{t}/state.json",
             ],
-            "--reinstate needs --training-end",
+            "--reinstate needs --sign-off",
+        ),
+        (
+            [
+                "evaluate",
+                "--challenger",
+                "{d}/challenger_no_training_end.csv",
+                "--baseline",
+                "{d}/baseline_log.csv",
+                "--actuals",
+                "{d}/synthetic_actuals.csv",
+                "--sign-off",
+            ],
+            "sign-off needs training_end on every challenger forecast",
         ),
     ],
 )

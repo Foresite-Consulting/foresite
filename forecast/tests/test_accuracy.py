@@ -190,6 +190,7 @@ def test_log_keeps_sub_second_issue_times_and_provenance(tmp_path: Path) -> None
         trend_factor=1.034567,
         trend_rule="trend_window",
         reference_days=(day(-364), day(-357)),
+        training_end=day(-1),
     )
     path = tmp_path / "log.csv"
     write_forecast_log(path, [fc])
@@ -199,7 +200,7 @@ def test_log_keeps_sub_second_issue_times_and_provenance(tmp_path: Path) -> None
 LOG_HEADER = ",".join(LOG_COLUMNS) + "\n"
 GOOD = (
     "2026-01-01T00:00:00Z,m,1,SYNTH-V,s,net_sales_ex_gst_cents,2026-01-01,2026-01-02,1,"
-    "10,5,15,r,i,0,1.0,trend_window,2025-01-03\n"
+    "10,5,15,r,i,0,1.0,trend_window,2025-01-03,2025-12-31\n"
 )
 
 
@@ -220,7 +221,9 @@ GOOD = (
         (",1.0,", ",abc,", "must be a number"),
         (",1.0,", ",nan,", "must be a number"),
         (",trend_window,", ",trend window,", "letters, digits"),
-        (",2025-01-03\n", ",2025-01-03;x\n", "separated by ';'"),
+        (",2025-01-03,", ",2025-01-03;x,", "separated by ';'"),
+        (",2025-12-31\n", ",31/12/2025\n", "blank or a real date"),
+        (",2025-12-31\n", ",2026-01-02\n", "look-ahead"),
     ],
 )
 def test_log_rejects_bad_rows(replace_from: str, replace_to: str, expected: str) -> None:
@@ -229,6 +232,11 @@ def test_log_rejects_bad_rows(replace_from: str, replace_to: str, expected: str)
     with pytest.raises(DataValidationError) as info:
         read_forecast_log((LOG_HEADER + body).encode())
     assert any(expected in str(i) for i in info.value.issues), info.value.issues
+
+
+def test_good_log_row_reads_training_end() -> None:
+    (fc,) = read_forecast_log((LOG_HEADER + GOOD).encode())
+    assert fc.training_end == date(2025, 12, 31)
 
 
 def test_log_without_optional_columns() -> None:

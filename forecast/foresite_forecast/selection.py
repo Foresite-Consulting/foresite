@@ -42,7 +42,7 @@ the CLI persists with ``evaluate --state <file>``): once
 venue x metric, every later check keeps deciding ``rollback_to_baseline`` and
 serving the baseline, whatever the weekly comparison says, until a person
 re-runs the Phase 2 gate and it passes (:func:`reinstate`;
-``evaluate --state <file> --reinstate --training-end <day>``). A new
+``evaluate --state <file> --reinstate --sign-off``). A new
 challenger version is a new challenger: it needs its own gate pass before it
 goes live. The weekly verdict is still recorded on the record as a
 re-confirmation (:class:`RollbackCheck`).
@@ -56,8 +56,10 @@ the id is taken from the record. Consumers de-duplicate on ``alert_id``;
 ``new`` is true only on the check that created the rollback record.
 
 *Phase 2 gate* (:func:`beats_baseline`): on the hold-out weeks (default the
-last 8 complete weeks), every week must be evaluable, the challenger's pooled
-WAPE must be lower than the baseline's by at least
+last 8 complete weeks), no forecast may come from a model whose logged
+``training_end`` is on or after its target week's Monday (and for sign-off
+every challenger row must log ``training_end``), every week must be
+evaluable, the challenger's pooled WAPE must be lower than the baseline's by at least
 ``min_relative_improvement`` (default 0: strictly lower), and the challenger
 must be strictly better in at least N of the M weeks, N =
 ``ceil(min_weeks_better_fraction x M)`` (default 0.75, so 6 of 8).
@@ -484,7 +486,7 @@ def _active_records(
 
 REINSTATE_HOW = (
     "it stays on the baseline until a person re-runs the Phase 2 gate and it passes "
-    "(evaluate --state <file> --reinstate --training-end <day>)"
+    "(evaluate --state <file> --reinstate --sign-off)"
 )
 
 
@@ -783,6 +785,24 @@ def write_rollback_state(path: Path, state: Iterable[RollbackRecord]) -> None:
         handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
+def _check_unseen(log: pl.DataFrame, label: str, weeks: Sequence[date]) -> None:
+    """Refuse hold-out forecasts made by a model trained on or after their target week."""
+    if "training_end" not in log.columns:
+        return
+    leaked = log.filter(
+        pl.col("training_end").is_not_null()
+        & pl.col("target_day").dt.truncate("1w").is_in(list(weeks))
+        & (pl.col("training_end") >= pl.col("target_day").dt.truncate("1w"))
+    )
+    if leaked.height:
+        first = leaked.sort("target_day").row(0, named=True)
+        raise ValueError(
+            f"{leaked.height} {label} forecast(s) in the hold-out weeks come from a model "
+            f"trained up to or after their target week (first: target {first['target_day']}, "
+            f"training_end {first['training_end']}); the gate must use weeks the model has not seen"
+        )
+
+
 def beats_baseline(
     challenger_log: pl.DataFrame,
     baseline_log: pl.DataFrame,
@@ -792,13 +812,18 @@ def beats_baseline(
     training_end: date | None = None,
     evaluation_day: date | None = None,
     config: GateConfig | None = None,
+    require_training_end: bool = False,
 ) -> list[GateResult]:
     """The Phase 2 gate, one result per venue x metric (see module docs).
 
     ``holdout_weeks`` is a number of most recent complete weeks, or explicit
     Mondays. ``training_end`` (the challenger's last training day), if given,
     must be before every hold-out week, so the gate never scores a model on
-    weeks it has seen.
+    weeks it has seen. Independently, any forecast in either log whose target
+    falls in a hold-out week and whose logged ``training_end`` is on or after
+    that week's Monday is rejected (``ValueError``). ``require_training_end``
+    (the CLI's ``--sign-off``) makes ``training_end`` mandatory on every
+    challenger row.
     """
     cfg = config or GateConfig()
     eval_day = evaluation_day or actuals.last_day()
@@ -824,6 +849,21 @@ def beats_baseline(
             f"hold-out week {weeks_list[0].isoformat()} starts on or before the end of training "
             f"({training_end.isoformat()}); the gate must use weeks the model has not seen"
         )
+    missing_te = challenger_log.clear()
+    if require_training_end:
+        missing_te = (
+            challenger_log.filter(pl.col("training_end").is_null())
+            if "training_end" in challenger_log.columns
+            else challenger_log
+        )
+    if missing_te.height:
+        first = missing_te.sort("target_day").row(0, named=True)
+        raise ValueError(
+            f"sign-off needs training_end on every challenger forecast; {missing_te.height} "
+            f"row(s) have none (first: target {first['target_day']}, issued {first['issued_at']})"
+        )
+    for label, log in (("challenger", challenger_log), ("baseline", baseline_log)):
+        _check_unseen(log, label, weeks_list)
     m = _match(challenger_log, baseline_log, actuals)
     required = cfg.weeks_required(len(weeks_list))
     results: list[GateResult] = []

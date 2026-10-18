@@ -193,6 +193,7 @@ def synthetic_challenger(
     metric: str = "net_sales_ex_gst_cents",
     degrade_from: date | None = None,
     model_id: str | None = None,
+    training_end: date | None = None,
 ) -> pl.DataFrame:
     """A SYNTHETIC challenger forecast log built from a baseline log (test oracle).
 
@@ -204,6 +205,8 @@ def synthetic_challenger(
       from it onwards, to test rollback after a model goes wrong.
 
     Low/high are scaled with the point. Unforecastable rows stay unforecastable.
+    ``training_end``, if given, is logged on every row as the earlier of it and
+    the row's ``as_of`` (a model can't have trained on days after it issued).
     """
     known = actuals.scored_actuals(metric).select(
         "venue_id", "section_id", "target_day", pl.col("actual").cast(pl.Float64)
@@ -237,6 +240,9 @@ def synthetic_challenger(
         point=pl.col("point_new"),
         model_id=pl.lit(name),
         model_version=pl.lit("synthetic"),
+        training_end=pl.lit(None, dtype=pl.Date())
+        if training_end is None
+        else pl.min_horizontal(pl.lit(training_end), pl.col("as_of")),
         rule=pl.when(pl.col("point_new").is_null())
         .then(pl.col("rule"))
         .otherwise(pl.lit("synthetic_oracle")),

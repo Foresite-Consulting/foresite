@@ -269,8 +269,8 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
         _distinct_output(args.state, *inputs)
     if args.reinstate and args.state is None:
         raise CliError("--reinstate needs --state (the rollback state file to update)")
-    if args.reinstate and args.training_end is None:
-        raise CliError("--reinstate needs --training-end: reinstating is a fresh Phase 2 gate pass")
+    if args.reinstate and not args.sign_off:
+        raise CliError("--reinstate needs --sign-off: reinstating is a fresh Phase 2 sign-off")
     actuals = read_daily_actuals(_existing(args.actuals, "actuals"))
     challenger = forecasts_to_frame(read_forecast_log(_existing(args.challenger, "challenger log")))
     baseline = forecasts_to_frame(read_forecast_log(_existing(args.baseline, "baseline log")))
@@ -283,6 +283,7 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
         training_end=args.training_end,
         evaluation_day=args.evaluation_day,
         config=GateConfig(selection=selection),
+        require_training_end=args.sign_off,
     )
     with exclusive_lock(args.state) if args.state is not None else nullcontext():
         state = read_rollback_state(args.state) if args.state is not None else []
@@ -364,7 +365,11 @@ def _cmd_synthetic_challenger(args: argparse.Namespace) -> int:
     actuals = read_daily_actuals(_existing(args.actuals, "actuals"))
     baseline = forecasts_to_frame(read_forecast_log(_existing(args.baseline_log, "baseline log")))
     frame = synthetic_challenger(
-        baseline, actuals, quality=args.quality, degrade_from=args.degrade_from
+        baseline,
+        actuals,
+        quality=args.quality,
+        degrade_from=args.degrade_from,
+        training_end=args.training_end,
     )
     forecasts = frame_to_forecasts(frame)
     write_forecast_log(args.out, forecasts)
@@ -430,9 +435,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="rollback state JSON to read and update (keeps a rollback in force across weeks)",
     )
     p.add_argument(
+        "--sign-off",
+        action="store_true",
+        help="Phase 2 sign-off run: every challenger row must log training_end",
+    )
+    p.add_argument(
         "--reinstate",
         action="store_true",
-        help="put a rolled-back challenger back live where the Phase 2 gate passes (needs --state)",
+        help="put a rolled-back challenger back live where the gate passes (--state, --sign-off)",
     )
     p.add_argument("--json", action="store_true", help="print JSON instead of text")
     p.set_defaults(func=_cmd_evaluate)
@@ -449,6 +459,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--actuals", type=Path, required=True)
     p.add_argument("--quality", choices=("good", "bad"), required=True)
     p.add_argument("--degrade-from", type=_date, help="good before this day, bad from it")
+    p.add_argument("--training-end", type=_date, help="log this training_end on every row")
     p.add_argument("--out", type=Path, required=True)
     p.set_defaults(func=_cmd_synthetic_challenger)
     return parser

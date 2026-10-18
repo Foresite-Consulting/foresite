@@ -29,6 +29,7 @@ class Forecast:
 
     * ``horizon_days == (target_day - as_of).days`` and is 1-28;
     * ``rule`` (provenance: which rule produced the point) is always set;
+    * ``training_end``, when set, is on or before ``as_of``;
     * either ``point``, ``low`` and ``high`` are all set with
       ``0 <= low <= point <= high``, or all three are ``None`` and ``rule`` is
       :data:`UNFORECASTABLE`.
@@ -56,6 +57,9 @@ class Forecast:
     trend_factor: float | None = None
     trend_rule: str | None = None
     reference_days: tuple[date, ...] = ()
+    #: Last day of the data the model was trained on (``None`` for rule-based
+    #: models such as the baseline, which are not trained). Never after ``as_of``.
+    training_end: date | None = None
 
     def __post_init__(self) -> None:
         if self.issued_at.tzinfo is None:
@@ -69,6 +73,8 @@ class Forecast:
             raise ValueError("horizon_days must equal target_day - as_of")
         if not self.rule:
             raise ValueError("rule (provenance) must be set")
+        if self.training_end is not None and self.training_end > self.as_of:
+            raise ValueError("training_end must not be after as_of (that would be look-ahead)")
         values = (self.point, self.low, self.high)
         if all(v is None for v in values):
             if self.rule != UNFORECASTABLE:

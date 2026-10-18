@@ -455,6 +455,50 @@ def test_gate_explicit_weeks_and_training_end() -> None:
     assert last4.passed
 
 
+def test_gate_rejects_holdout_forecasts_from_a_model_trained_on_that_week() -> None:
+    s = scenario(["better"] * 8)
+    first_holdout = FIRST_MONDAY
+    # Trained up to the Sunday before the first hold-out week: fine.
+    ok = s.challenger.with_columns(training_end=pl.lit(first_holdout - timedelta(days=1)))
+    (g,) = beats_baseline(ok, s.baseline, s.actuals, require_training_end=True)
+    assert g.passed
+    # One row whose model was trained up to its own week's Monday: refused (boundary is >=).
+    target = first_holdout + timedelta(weeks=3, days=2)
+    leaky = ok.with_columns(
+        training_end=pl.when(pl.col("target_day") == target)
+        .then(pl.lit(target - timedelta(days=2)))
+        .otherwise(pl.col("training_end"))
+    )
+    with pytest.raises(ValueError, match=r"1 challenger forecast\(s\) in the hold-out weeks"):
+        beats_baseline(leaky, s.baseline, s.actuals)
+    # The same row outside the hold-out weeks is not the gate's concern.
+    (g,) = beats_baseline(leaky, s.baseline, s.actuals, holdout_weeks=3)
+    assert g.passed
+    leaky_baseline = s.baseline.with_columns(training_end=pl.lit(first_holdout))
+    with pytest.raises(ValueError, match="baseline forecast"):
+        beats_baseline(ok, leaky_baseline, s.actuals)
+
+
+def test_sign_off_needs_training_end_on_every_challenger_row() -> None:
+    s = scenario(["better"] * 8)
+    (g,) = beats_baseline(s.challenger, s.baseline, s.actuals)  # not a sign-off run: allowed
+    assert g.passed
+    with pytest.raises(ValueError, match=r"sign-off needs training_end.*56 row"):
+        beats_baseline(s.challenger, s.baseline, s.actuals, require_training_end=True)
+    partly = s.challenger.with_columns(
+        training_end=pl.when(pl.col("target_day") > FIRST_MONDAY)
+        .then(pl.lit(FIRST_MONDAY - timedelta(days=1)))
+        .otherwise(None)
+    )
+    with pytest.raises(ValueError, match=r"1 row\(s\) have none \(first: target 2026-01-05"):
+        beats_baseline(partly, s.baseline, s.actuals, require_training_end=True)
+    no_column = s.challenger.drop("training_end")
+    (g,) = beats_baseline(no_column, s.baseline.drop("training_end"), s.actuals)
+    assert g.passed
+    with pytest.raises(ValueError, match="sign-off needs training_end"):
+        beats_baseline(no_column, s.baseline, s.actuals, require_training_end=True)
+
+
 def test_weeks_required() -> None:
     assert GateConfig().weeks_required(8) == 6
     assert GateConfig().weeks_required(4) == 3
