@@ -6,9 +6,9 @@
  * Venue configuration is client data. It lives in the client's database, not
  * in this repo; the only venues here are fictional test venues.
  */
-import { Temporal } from '@js-temporal/polyfill';
 import { z } from 'zod';
 import { WEEKDAYS, isTradingDay, type Weekday } from '../time/dates';
+import { timeZoneProblem } from '../time/zones';
 
 /** Default IANA time zone for a new venue (Foresite's home market). */
 export const DEFAULT_TIME_ZONE = 'Australia/Perth';
@@ -148,27 +148,6 @@ export const dateExceptionSchema = z.discriminatedUnion('kind', [
 export type DateException = z.output<typeof dateExceptionSchema>;
 export type DateExceptionKind = DateException['kind'];
 
-function isIanaZoneName(zone: string): boolean {
-  // Reject fixed offsets ("+08:00"), which Temporal accepts but which have no
-  // daylight-saving rules and are not IANA names.
-  if (!/^[A-Za-z][A-Za-z0-9_+\-/]*$/.test(zone)) return false;
-  try {
-    Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(zone);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function canonicalZone(zone: string): string {
-  // zod runs transforms on input that already has issues, so this must not throw.
-  try {
-    return Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(zone).timeZoneId;
-  } catch {
-    return zone;
-  }
-}
-
 const isClock = (value: string): boolean => CLOCK_PATTERN.test(value);
 
 function checkSessions(
@@ -220,11 +199,18 @@ const venueObjectSchema = z
   .object({
     id: slug,
     name: label,
-    /** IANA time-zone name, e.g. `Australia/Perth`. Fixed offsets are rejected. */
+    /**
+     * Canonical IANA time-zone name, e.g. `Australia/Perth`. Links
+     * (`Australia/NSW`), `UTC`, `GMT`, abbreviations (`EST`) and fixed
+     * offsets (`+08:00`) are rejected with a message naming what to use.
+     */
     timeZone: z
       .string()
       .default(DEFAULT_TIME_ZONE)
-      .refine(isIanaZoneName, 'Use an IANA time zone such as Australia/Perth or Australia/Sydney'),
+      .superRefine((zone, ctx) => {
+        const problem = timeZoneProblem(zone);
+        if (problem !== null) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+      }),
     /**
      * Local time at which one trading day ends and the next begins, `HH:MM`.
      * Default `05:00`.
@@ -310,7 +296,6 @@ export const venueSchema = venueObjectSchema
   .transform((venue) =>
     deepFreeze({
       ...venue,
-      timeZone: canonicalZone(venue.timeZone),
       exceptions: [...venue.exceptions].sort((a, b) => a.date.localeCompare(b.date)),
     }),
   );
@@ -326,8 +311,9 @@ export interface Section {
 }
 
 /**
- * A validated venue: the output of {@link parseVenue}. Deeply frozen, with the
- * time zone in canonical form and exceptions sorted by date.
+ * A validated venue: the output of {@link parseVenue}. Deeply frozen, with a
+ * canonical IANA time zone (validation rejects links) and exceptions sorted
+ * by date.
  */
 export interface Venue {
   readonly id: string;

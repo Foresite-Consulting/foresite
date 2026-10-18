@@ -23,7 +23,7 @@ Generates SYNTHETIC data for the fictional Harbourside Test Venue.
   --out <dir>         Output folder (created if missing). Required.
   --seed <n>          PRNG seed, 0 to 4294967295. Default ${DEFAULT_SYNTHETIC_SEED}.
   --start <date>      First trading day, YYYY-MM-DD. Default ${DEFAULT_SYNTHETIC_START_DAY}.
-  --time-zone <zone>  IANA time zone. Default Australia/Perth.
+  --time-zone <zone>  Canonical IANA time zone. Default Australia/Perth.
   --anomalies         Turn on every anomaly below.
   --closed-day        Add an unplanned closed day.
   --data-gap          Add a two-hour gap in the bar's sales rows.

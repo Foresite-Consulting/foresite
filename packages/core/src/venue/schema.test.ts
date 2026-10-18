@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { testVenueConfig } from '../test-support';
+import { canonicalTimeZones } from '../time/zones';
 import {
   DEFAULT_CUT_OVER,
   DEFAULT_TIME_ZONE,
@@ -70,12 +71,6 @@ describe('parseVenue', () => {
     expect(Object.isFrozen(venue.sections[0]?.hours.mon?.[0])).toBe(true);
   });
 
-  it('canonicalises the time-zone name', () => {
-    expect(parseVenue(testVenueConfig({ timeZone: 'australia/sydney' })).timeZone).toBe(
-      'Australia/Sydney',
-    );
-  });
-
   it('sorts exceptions by date', () => {
     const venue = parseVenue(
       testVenueConfig({
@@ -91,18 +86,88 @@ describe('parseVenue', () => {
     ]);
   });
 
-  it('rejects fixed offsets and unknown zones', () => {
-    for (const timeZone of ['+08:00', '-05:00', 'Mars/Olympus_Mons', '', 'UTC+8']) {
+  it('rejects link names, naming the canonical zone', () => {
+    const links: [string, string][] = [
+      ['Australia/NSW', 'Australia/Sydney'],
+      ['Australia/ACT', 'Australia/Sydney'],
+      ['Australia/Canberra', 'Australia/Sydney'],
+      ['Australia/West', 'Australia/Perth'],
+      ['Australia/Victoria', 'Australia/Melbourne'],
+      ['Australia/South', 'Australia/Adelaide'],
+      ['Australia/LHI', 'Australia/Lord_Howe'],
+      ['australia/sydney', 'Australia/Sydney'],
+      ['Asia/Calcutta', 'Asia/Kolkata'],
+      ['US/Eastern', 'America/New_York'],
+    ];
+    for (const [timeZone, canonical] of links) {
       expect(issues(testVenueConfig({ timeZone })), timeZone).toEqual([
-        'timeZone: Use an IANA time zone such as Australia/Perth or Australia/Sydney',
+        `timeZone: "${timeZone}" is an alias of ${canonical}: use the canonical name ${canonical}.`,
       ]);
     }
   });
 
-  it('accepts other IANA zones, including UTC', () => {
-    for (const timeZone of ['UTC', 'Australia/Lord_Howe', 'Australia/Adelaide', 'Etc/GMT-10']) {
-      expect(issues(testVenueConfig({ timeZone })), timeZone).toEqual([]);
+  it('rejects fixed offsets, UTC, GMT and abbreviations', () => {
+    for (const timeZone of [
+      '+08:00',
+      '-05:00',
+      '−05:00',
+      'UTC',
+      'GMT',
+      'EST',
+      'AEST',
+      'UTC+8',
+      'Etc/GMT-10',
+      'Etc/UTC',
+      '',
+    ]) {
+      expect(issues(testVenueConfig({ timeZone })), timeZone).toEqual([
+        `timeZone: "${timeZone}" is not a location time zone (fixed offsets, UTC, GMT and abbreviations such as EST are not accepted). Use a canonical IANA time zone such as Australia/Perth or Australia/Sydney.`,
+      ]);
     }
+  });
+
+  it('rejects unknown zones', () => {
+    expect(issues(testVenueConfig({ timeZone: 'Mars/Olympus_Mons' }))).toEqual([
+      'timeZone: Unknown time zone "Mars/Olympus_Mons". Use a canonical IANA time zone such as Australia/Perth or Australia/Sydney.',
+    ]);
+  });
+
+  it('accepts canonical IANA zones, including IANA spellings ICU writes the old way', () => {
+    for (const timeZone of [
+      'Australia/Perth',
+      'Australia/Sydney',
+      'Australia/Lord_Howe',
+      'Australia/Adelaide',
+      'Australia/Broken_Hill',
+      'Asia/Kolkata',
+      'Asia/Kathmandu',
+      'Europe/Kyiv',
+      'Pacific/Chatham',
+    ]) {
+      expect(issues(testVenueConfig({ timeZone })), timeZone).toEqual([]);
+      expect(parseVenue(testVenueConfig({ timeZone })).timeZone).toBe(timeZone);
+    }
+  });
+
+  it('lists exactly the canonical Australian zones', () => {
+    expect(
+      [...canonicalTimeZones()].filter((zone) => zone.startsWith('Australia/')).sort(),
+    ).toEqual([
+      'Australia/Adelaide',
+      'Australia/Brisbane',
+      'Australia/Broken_Hill',
+      'Australia/Darwin',
+      'Australia/Eucla',
+      'Australia/Hobart',
+      'Australia/Lindeman',
+      'Australia/Lord_Howe',
+      'Australia/Melbourne',
+      'Australia/Perth',
+      'Australia/Sydney',
+    ]);
+    // ICU's old spellings are replaced by the IANA names.
+    expect(canonicalTimeZones().has('Asia/Calcutta')).toBe(false);
+    expect(canonicalTimeZones().has('Asia/Kolkata')).toBe(true);
   });
 
   it('rejects malformed fields with plain messages', () => {
