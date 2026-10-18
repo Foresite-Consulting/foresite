@@ -67,6 +67,19 @@ def test_identical_issue_times_keep_the_later_row() -> None:
         assert scored["point"].to_list() == [expected]
 
 
+def test_later_unforecastable_reissue_retires_the_earlier_point() -> None:
+    actuals = build_actuals(MON, [100, 100])
+    earlier = make_forecast(day(0), 90, issued_at=ISSUED - timedelta(days=1))
+    later = make_forecast(day(0), None)  # same model, target and horizon, no point
+    kept = make_forecast(day(1), 95)
+    scored = score(forecasts_to_frame([earlier, later, kept]), actuals)
+    assert scored["target_day"].to_list() == [day(1)]
+    # The reverse order (point issued after the unforecastable one) still scores the point.
+    reissued = make_forecast(day(0), 90, issued_at=ISSUED + timedelta(days=1))
+    scored = score(forecasts_to_frame([later, reissued]), actuals)
+    assert scored["point"].to_list() == [90]
+
+
 def test_metric_definitions() -> None:
     _, scored = worked_example()
     (row,) = metrics(scored).iter_rows(named=True)

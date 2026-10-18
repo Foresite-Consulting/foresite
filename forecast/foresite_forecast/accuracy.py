@@ -45,7 +45,9 @@ Metric definitions (for scored rows: forecastable, actual known, day open):
 * **Coverage** = share of rows with ``low <= actual <= high``.
 
 If the same model issued the same target at the same horizon more than once,
-only the latest issue counts. Closed and missing days are never scored.
+only the latest issue counts, even when that latest issue is ``unforecastable``:
+a later re-issue without a point retires the earlier point from scoring (the
+model withdrew it). Closed and missing days are never scored.
 Weeks run Monday to Sunday by target trading day.
 """
 
@@ -430,13 +432,14 @@ def score(
 ) -> pl.DataFrame:
     """Join forecasts with known actuals.
 
-    Keeps forecastable rows whose target day is open with a known actual, after
-    :func:`latest_issues`. Adds ``actual``, ``error`` (point - actual),
+    Applies :func:`latest_issues` first and only then drops rows without a
+    point, so a later ``unforecastable`` re-issue supersedes (retires) an
+    earlier point. Keeps rows whose target day is open with a known actual. Adds ``actual``, ``error`` (point - actual),
     ``abs_error``, ``in_range``, ``weekday`` (1 = Monday), ``week_start``
     (Monday) and ``horizon_bucket``.
     """
     cfg = interval_config or IntervalConfig()
-    forecastable = latest_issues(log.filter(pl.col("point").is_not_null()))
+    forecastable = latest_issues(log).filter(pl.col("point").is_not_null())
     metrics = [m for m in METRICS if m in actuals.metrics]
     known = pl.concat([actuals.scored_actuals(m) for m in metrics])
     joined = forecastable.join(

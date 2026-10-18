@@ -79,7 +79,7 @@ From the baseline's own rolling backtest: every forecast issued in the **364 day
 
 ### Accuracy (per model × venue × metric; also by horizon, bucket, weekday, section, week and rolling 4 weeks)
 
-Scored rows: the model gave a point, the target day was open and its actual is known; if the same model issued the same target at the same horizon twice, only the latest issue counts. Closed and missing days are never scored.
+Scored rows: the model gave a point, the target day was open and its actual is known; if the same model issued the same target at the same horizon twice, only the latest issue counts. De-duplication happens *before* rows without a point are dropped, so a later `unforecastable` re-issue retires the earlier point from scoring (the model withdrew it; see decision 5 below). Closed and missing days are never scored.
 
 - **WAPE** = Σ|actual − point| / Σ actual (primary; blank if Σ actual = 0).
 - **MAPE** = mean |actual − point| / actual over rows with actual > 0 only.
@@ -124,3 +124,4 @@ Interval coverage is reported but not part of the gate (see below).
 2. Rollback pools all horizons 1-28. Should it weight the horizons managers use most (for example 1-7 days for rostering)?
 3. Weeks run Monday to Sunday. Confirm this matches how venues report.
 4. `insufficient_data` keeps the challenger live. The alternative is to fall back to the baseline after N insufficient weeks (an outage signal). Which do we want?
+5. A later `unforecastable` re-issue of the same target and horizon supersedes an earlier point, so that point is no longer scored ("only the latest issue counts", applied literally). The alternative is to keep scoring the last issue that *had* a point. The chosen rule means a model cannot be judged on a number it withdrew, but it also means a model that withdraws hard days drops them from its own accuracy; the rollback and gate comparison still requires the challenger to cover 90% of the baseline's scored forecasts each week, which limits that. Confirm.

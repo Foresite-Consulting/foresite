@@ -155,7 +155,7 @@ Owner: `forecast/` (Python). Full rules and their rationale: `docs/adr/0004-fore
 
 ### Accuracy measures
 
-Computed per model × venue × metric over **scored** forecasts: the model gave a point, the target day was `open` and its actual is known, keeping only the latest issue per target and horizon. Closed and missing days are never scored. Weeks are Monday to Sunday by target trading day.
+Computed per model × venue × metric over **scored** forecasts: the model gave a point, the target day was `open` and its actual is known, keeping only the latest issue per target and horizon (a later `unforecastable` re-issue retires an earlier point). Closed and missing days are never scored. Weeks are Monday to Sunday by target trading day.
 
 | Measure                 | Formula                                                   | Notes                                                                                        |
 | ----------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
