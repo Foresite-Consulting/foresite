@@ -69,7 +69,7 @@ None defined yet. Each KPI (GP, labour %, spend per head, vs budget, vs last yea
 
 ## Synthetic data (development and tests only)
 
-`npm run synth -w packages/core -- --days 730 --seed 42 --out <dir>` (run from the repo root; a relative `--out` resolves from where npm was run). Generator: `packages/core/src/synthetic/`. Fictional venue: **Harbourside Test Venue**. Every CSV starts with `# SYNTHETIC DATA - not from any real venue`. Committed fixture (14 days from `2024-12-20`, seed 42): `packages/core/fixtures/synthetic/`; regenerate with `npm run synth -w packages/core -- --days 14 --seed 42 --out packages/core/fixtures/synthetic`.
+`npm run synth -w packages/core -- --days 730 --seed 42 --out <dir>` (run from the repo root; a relative `--out` resolves from where npm was run). Generator: `packages/core/src/synthetic/`. Fictional venue: **Harbourside Test Venue**. Every CSV starts with `# SYNTHETIC DATA - not from any real venue`. A text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading `'` so a spreadsheet does not run it as a formula (numbers, including negative amounts, are never prefixed; no generated cell currently needs it). Committed fixture (14 days from `2024-12-20`, seed 42): `packages/core/fixtures/synthetic/`; regenerate with `npm run synth -w packages/core -- --days 14 --seed 42 --out packages/core/fixtures/synthetic`.
 
 ### `intervals.csv`: one row per section × 15-minute interval with scheduled hours
 

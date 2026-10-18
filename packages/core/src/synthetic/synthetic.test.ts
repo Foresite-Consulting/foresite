@@ -347,6 +347,42 @@ describe('csv', () => {
       `# ${SYNTHETIC_NOTICE}\na,b\nplain,1\n"has,comma",2\n"has ""quote""",3\n"line\nbreak",4\n`,
     );
   });
+
+  it('guards text cells that a spreadsheet would read as a formula', () => {
+    const cells = [
+      '=SUM(A1:A9)',
+      '+61 8 9000 0000',
+      '-1+1',
+      '@cmd',
+      '\tx',
+      '\rx',
+      '=a,b',
+      "'ok",
+      'a=b',
+    ];
+    const text = toCsv(
+      cells.map((a) => ({ a, b: -250 })),
+      ['a', 'b'],
+    );
+    expect(text.split('\n').slice(2, -1)).toEqual([
+      "'=SUM(A1:A9),-250",
+      "'+61 8 9000 0000,-250",
+      "'-1+1,-250",
+      "'@cmd,-250",
+      "'\tx,-250",
+      '"\'\rx",-250',
+      '"\'=a,b",-250',
+      "'ok,-250",
+      'a=b,-250',
+    ]);
+  });
+
+  it('leaves the generated files untouched (no cell needs the guard)', () => {
+    for (const [name, contents] of Object.entries(datasetFiles(season))) {
+      if (!name.endsWith('.csv')) continue;
+      expect(contents, name).not.toMatch(/(?:^|,)['=+@\t\r-]/m);
+    }
+  });
 });
 
 describe('synth CLI', { timeout: 30_000 }, () => {

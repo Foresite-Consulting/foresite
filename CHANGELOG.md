@@ -18,6 +18,7 @@ Plain-language notes first, then the technical detail. Dates as `18 Oct 2026`.
   - Venue `timeZone` must be a canonical IANA name: links such as `Australia/NSW` are rejected with the canonical zone in the message (no longer silently accepted), as are `UTC`, `GMT`, `EST`, `Etc/…` and fixed offsets.
   - A `special_hours` exception with `hours: {}` is rejected; it must list at least one section.
   - Data dictionary: GST is rounded per row; aggregate GST is the sum of row `gst_cents`, never recomputed from aggregate net.
+  - `toCsv` guards against formula injection: text cells starting with `=`, `+`, `-`, `@`, tab or CR get a leading `'`. The committed fixture is unchanged byte for byte.
   - Instants: `InstantInput` is now `Date | string`; numbers are rejected by the type and at runtime (epoch seconds could pass as milliseconds). New `fromEpochMs(ms)` for explicit conversion. ISO strings with a bracketed annotation (`[...]`) are rejected.
 - Coverage gate: `npm run coverage` (part of `npm run check` and CI) with 95% thresholds for `packages/core`, using `@vitest/coverage-v8` 4.1.11.
 

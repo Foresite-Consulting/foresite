@@ -3,7 +3,9 @@
  *
  * Every CSV starts with the comment line `# SYNTHETIC DATA - not from any
  * real venue`, then a header row. Lines end in `\n`; fields are quoted only
- * when they need it (RFC 4180 style). Timestamps are ISO 8601 UTC, plus the
+ * when they need it (RFC 4180 style). A text cell starting with `=`, `+`,
+ * `-`, `@`, a tab or a carriage return is prefixed with `'` so spreadsheets
+ * do not run it as a formula (numbers are never prefixed). Timestamps are ISO 8601 UTC, plus the
  * local start with its offset for reading.
  */
 import {
@@ -50,8 +52,16 @@ export const WEATHER_COLUMNS = [
   'rain_tenths_mm',
 ] as const satisfies readonly (keyof SyntheticWeatherDay)[];
 
+/** First characters a spreadsheet may read as the start of a formula. */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 function field(value: string | number): string {
-  const text = String(value);
+  let text = String(value);
+  // Formula-injection guard: a text cell that starts like a formula gets a
+  // leading single quote, so Excel, Sheets and Numbers show it as text.
+  // Numbers are left alone: a negative amount must stay a number, and a
+  // number cannot carry a formula.
+  if (typeof value === 'string' && FORMULA_START.test(text)) text = `'${text}`;
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
