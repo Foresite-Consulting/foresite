@@ -203,4 +203,18 @@ describe('authenticateDevice with the verified-credential cache', () => {
     await authenticateDevice(repo, 'milesight', basicAuth('dev-one', oldSecret), verify, cache);
     expect(verify).toHaveBeenCalledTimes(2);
   });
+
+  it('answers recentlyVerified for the exact id and secret only, until expiry or forget', () => {
+    let now = 0;
+    const cache = new VerifiedCredentialCache(1_000, 10, () => now);
+    cache.remember('milesight:dev-one', oldSecret, ['h1'], 1);
+    expect(cache.recentlyVerified('milesight:dev-one', oldSecret)).toBe(true);
+    expect(cache.recentlyVerified('milesight:dev-one', `${oldSecret}x`)).toBe(false);
+    expect(cache.recentlyVerified('milesight:dev-two', oldSecret)).toBe(false);
+    cache.forget('milesight:dev-one');
+    expect(cache.recentlyVerified('milesight:dev-one', oldSecret)).toBe(false);
+    cache.remember('milesight:dev-one', oldSecret, ['h1'], 1);
+    now = 1_001;
+    expect(cache.recentlyVerified('milesight:dev-one', oldSecret)).toBe(false);
+  });
 });

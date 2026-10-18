@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { basicAuth, floorToMinutes, milesightPeriodic } from '../../test/ingest-helpers';
+import { VerifiedCredentialCache } from './auth-cache';
 import { DEFAULT_CLOCK_POLICY } from './clock';
 import { handleCounterIngest, type IngestDeps } from './handler';
 import type { IngestLogEntry } from './log';
@@ -390,6 +391,69 @@ describe('refusals', () => {
     expect(Number(throttled.headers.get('retry-after'))).toBeGreaterThan(0);
     // Another address is unaffected.
     expect((await post(s, { headers: { 'x-real-ip': '203.0.113.8' } })).status).toBe(201);
+  });
+
+  describe('failed-login throttle behind a shared address (review F2)', () => {
+    const shared = { 'x-real-ip': '203.0.113.50' };
+    const bad = (id: string) => ({ auth: basicAuth(id, 'wrong-secret-123456'), headers: shared });
+    const twoDevices = () => [device(), device({ deviceId: 'door-02' })];
+
+    it('a valid device from an address throttled for another device id still gets 201', async () => {
+      const s = setup({}, twoDevices());
+      for (let i = 0; i < 5; i += 1) expect((await post(s, bad('door-02'))).status).toBe(401);
+      expect((await post(s, bad('door-02'))).status).toBe(429);
+      // door-01 shares the address but has its own strict bucket.
+      expect((await post(s, { headers: shared })).status).toBe(201);
+    });
+
+    it('a malformed header is throttled on a key of its own', async () => {
+      const s = setup();
+      for (let i = 0; i < 5; i += 1) {
+        expect((await post(s, { auth: 'Basic !!!', headers: shared })).status).toBe(401);
+      }
+      expect((await post(s, { auth: 'Basic !!!', headers: shared })).status).toBe(429);
+      expect((await post(s, { headers: shared })).status).toBe(201);
+    });
+
+    it('spraying many device ids from one address is stopped by the per-address backstop', async () => {
+      const s = setup({
+        authFailureAddressLimiter: new MemoryTokenBucket({
+          capacity: 20,
+          refillPerSecond: 20 / 60,
+          now: () => NOW,
+        }),
+      });
+      const statuses: number[] = [];
+      for (let i = 0; i < 25; i += 1) statuses.push((await post(s, bad(`spray-${i}`))).status);
+      expect(statuses.slice(0, 20).every((code) => code === 401)).toBe(true);
+      expect(statuses.slice(20).every((code) => code === 429)).toBe(true);
+      // A device not yet verified in this instance waits like everyone else...
+      expect((await post(s, { headers: shared })).status).toBe(429);
+      // ...but another address is unaffected.
+      expect((await post(s, { headers: { 'x-real-ip': '203.0.113.51' } })).status).toBe(201);
+    });
+
+    it('a credential in the verified cache skips the address checks', async () => {
+      const authCache = new VerifiedCredentialCache(60_000, 100, () => NOW);
+      const s = setup({
+        authCache,
+        authFailureAddressLimiter: new MemoryTokenBucket({
+          capacity: 3,
+          refillPerSecond: 3 / 60,
+          now: () => NOW,
+        }),
+      });
+      expect((await post(s, { headers: shared })).status).toBe(201);
+      for (let i = 0; i < 3; i += 1) expect((await post(s, bad(`spray-${i}`))).status).toBe(401);
+      expect((await post(s, bad('spray-x'))).status).toBe(429);
+      const again = await post(s, {
+        headers: shared,
+        body: milesightPeriodic({ start: intervalStart(1) }),
+      });
+      expect(again.status).toBe(201);
+      // A wrong secret for a cached device is not trusted and is throttled.
+      expect((await post(s, bad('door-01'))).status).toBe(429);
+    });
   });
 
   it('answers 429 with Retry-After when a device exceeds its rate', async () => {

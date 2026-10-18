@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getCounterAdapter, hashPayload } from '@foresite/connectors/counters';
-import { authenticateDevice } from './auth';
+import { authenticateDevice, parseBasicAuth } from './auth';
 import type { VerifiedCredentialCache } from './auth-cache';
 import { judgeReadingClock, type ClockPolicy } from './clock';
 import {
@@ -26,7 +26,8 @@ import type {
  * Order of checks, cheapest first and nothing read from the body before the
  * device has authenticated:
  *   HTTPS (production) → provider → Content-Type → Content-Length → storage
- *   configured → failed-login limit for the client address → HTTP Basic
+ *   configured → failed-login limits (address + claimed device id, then a
+ *   looser per-address backstop; skipped for a recently verified credential) → HTTP Basic
  *   device auth → per-device rate limit → body size while streaming → JSON →
  *   vendor schema → serial check → clock sanity → store (deduplicated).
  *
@@ -37,7 +38,17 @@ export interface IngestDeps {
   /** `null` when no storage is configured: every request gets 503. */
   repository: IngestRepository | null;
   deviceLimiter: RateLimiter;
+  /**
+   * Failed logins per client address AND claimed device id. Strict. Keyed on
+   * both so one misconfigured device behind a shared address (carrier-grade
+   * NAT on 4G) cannot lock out the others.
+   */
   authFailureLimiter: RateLimiter;
+  /**
+   * Failed logins per client address, any device id. Looser: the backstop
+   * against spraying many device ids from one address. Omit to disable.
+   */
+  authFailureAddressLimiter?: RateLimiter;
   clock: ClockPolicy;
   maxBodyBytes: number;
   requireHttps: boolean;
@@ -99,18 +110,33 @@ export async function handleCounterIngest(
   const repository = deps.repository;
   if (repository === null) return fail(503, 'storage_unavailable', {}, { 'Retry-After': '60' });
 
-  // Slow down guessing before spending CPU on scrypt.
+  // Slow down guessing before spending CPU on scrypt. The strict bucket is
+  // per address and claimed device id; a malformed header gets a key of its
+  // own. A credential that passed recently (in the verified cache) skips both
+  // checks, so a good device is never locked out by its neighbours.
   const address = clientAddress(request.headers);
-  const failureBudget = await deps.authFailureLimiter.check(address);
-  if (!failureBudget.allowed) {
-    return fail(
-      429,
-      'rate_limited',
-      { outcome: 'auth_throttled' },
-      {
-        'Retry-After': String(failureBudget.retryAfterSeconds),
-      },
-    );
+  const authorization = request.headers.get('authorization');
+  const claimed = parseBasicAuth(authorization);
+  const failureKey = `${address}|${claimed === null ? '#malformed' : claimed.deviceId}`;
+  const cacheKey = claimed === null ? null : `${adapter.provider}:${claimed.deviceId}`;
+  const trusted =
+    claimed !== null &&
+    cacheKey !== null &&
+    deps.authCache?.recentlyVerified(cacheKey, claimed.secret) === true;
+  if (!trusted) {
+    const decisions = [await deps.authFailureLimiter.check(failureKey)];
+    if (deps.authFailureAddressLimiter !== undefined) {
+      decisions.push(await deps.authFailureAddressLimiter.check(address));
+    }
+    const denied = decisions.filter((d) => !d.allowed);
+    if (denied.length > 0) {
+      return fail(
+        429,
+        'rate_limited',
+        { outcome: 'auth_throttled' },
+        { 'Retry-After': String(Math.max(...denied.map((d) => d.retryAfterSeconds))) },
+      );
+    }
   }
 
   let auth;
@@ -118,7 +144,7 @@ export async function handleCounterIngest(
     auth = await authenticateDevice(
       repository,
       adapter.provider,
-      request.headers.get('authorization'),
+      authorization,
       undefined,
       deps.authCache,
     );
@@ -131,7 +157,9 @@ export async function handleCounterIngest(
     );
   }
   if (!auth.ok) {
-    await deps.authFailureLimiter.take(address);
+    if (cacheKey !== null) deps.authCache?.forget(cacheKey);
+    await deps.authFailureLimiter.take(failureKey);
+    await deps.authFailureAddressLimiter?.take(address);
     return fail(
       401,
       'unauthorized',

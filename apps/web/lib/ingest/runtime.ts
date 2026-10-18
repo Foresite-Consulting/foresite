@@ -80,6 +80,10 @@ export function getIngestDeps(): IngestDeps {
       capacity: config.authFailuresPerMinute,
       refillPerSecond: config.authFailuresPerMinute / 60,
     }),
+    authFailureAddressLimiter: new MemoryTokenBucket({
+      capacity: config.authFailuresPerAddressPerMinute,
+      refillPerSecond: config.authFailuresPerAddressPerMinute / 60,
+    }),
     clock: config.clock,
     maxBodyBytes: config.maxBodyBytes,
     requireHttps: config.requireHttps,

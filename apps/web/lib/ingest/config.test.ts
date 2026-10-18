@@ -30,6 +30,7 @@ describe('loadIngestConfig', () => {
         clock: { maxFutureMinutes: 10, maxAgeDays: 30, lateAfterMinutes: 15 },
         rateLimit: { capacity: 60, refillPerSecond: 1 },
         authFailuresPerMinute: 10,
+        authFailuresPerAddressPerMinute: 100,
       },
     });
   });

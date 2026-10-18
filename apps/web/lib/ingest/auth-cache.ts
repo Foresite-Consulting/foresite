@@ -19,7 +19,10 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
  */
 export class VerifiedCredentialCache {
   private readonly key = randomBytes(32);
-  private readonly entries = new Map<string, { tag: Buffer; slot: number; expiresAt: number }>();
+  private readonly entries = new Map<
+    string,
+    { tag: Buffer; idTag: Buffer; slot: number; expiresAt: number }
+  >();
 
   constructor(
     private readonly ttlMs = 10 * 60_000,
@@ -31,6 +34,29 @@ export class VerifiedCredentialCache {
     return createHmac('sha256', this.key)
       .update(JSON.stringify([deviceId, secret, hashes]))
       .digest();
+  }
+
+  /** Tag over the id and secret only, for `recentlyVerified` (before the stored hashes are read). */
+  private idTag(deviceId: string, secret: string): Buffer {
+    return createHmac('sha256', this.key)
+      .update(JSON.stringify(['id', deviceId, secret]))
+      .digest();
+  }
+
+  /**
+   * Whether this id and secret passed recently, without reading storage. Used
+   * only to let a known-good device past the failed-login throttle (review
+   * F2); the full check (`lookup` against the current hashes, or scrypt)
+   * still runs afterwards, and a failure there calls `forget`.
+   */
+  recentlyVerified(deviceId: string, secret: string): boolean {
+    const entry = this.entries.get(deviceId);
+    if (entry === undefined || entry.expiresAt <= this.now()) return false;
+    return timingSafeEqual(entry.idTag, this.idTag(deviceId, secret));
+  }
+
+  forget(deviceId: string): void {
+    this.entries.delete(deviceId);
   }
 
   /** The matching slot (1 or 2) if this exact credential passed recently, else null. */
@@ -48,6 +74,7 @@ export class VerifiedCredentialCache {
     this.entries.delete(deviceId);
     this.entries.set(deviceId, {
       tag: this.tag(deviceId, secret, hashes),
+      idTag: this.idTag(deviceId, secret),
       slot,
       expiresAt: this.now() + this.ttlMs,
     });

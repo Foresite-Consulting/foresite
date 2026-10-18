@@ -70,6 +70,7 @@ const envSchema = z.object({
   INGEST_RATE_LIMIT_CAPACITY: intFrom(60, 1, 100_000),
   INGEST_RATE_LIMIT_REFILL_PER_SECOND: numberFrom(1, 0.001, 1_000),
   INGEST_AUTH_FAILURES_PER_MINUTE: intFrom(10, 1, 10_000),
+  INGEST_AUTH_FAILURES_PER_ADDRESS_PER_MINUTE: intFrom(100, 1, 100_000),
 });
 
 export type IngestStorageConfig =
@@ -82,7 +83,10 @@ export interface IngestConfig {
   maxBodyBytes: number;
   clock: ClockPolicy;
   rateLimit: { capacity: number; refillPerSecond: number };
+  /** Failed logins per minute per client address and claimed device id. */
   authFailuresPerMinute: number;
+  /** Failed logins per minute per client address, any device id (backstop). */
+  authFailuresPerAddressPerMinute: number;
 }
 
 export type ConfigResult = { ok: true; config: IngestConfig } | { ok: false; problems: string[] };
@@ -155,6 +159,7 @@ export function loadIngestConfig(env: Record<string, string | undefined>): Confi
         refillPerSecond: e.INGEST_RATE_LIMIT_REFILL_PER_SECOND,
       },
       authFailuresPerMinute: e.INGEST_AUTH_FAILURES_PER_MINUTE,
+      authFailuresPerAddressPerMinute: e.INGEST_AUTH_FAILURES_PER_ADDRESS_PER_MINUTE,
     },
   };
 }
