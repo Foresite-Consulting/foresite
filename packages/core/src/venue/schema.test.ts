@@ -363,6 +363,23 @@ describe('parseVenue', () => {
       expect(
         issues({
           ...testVenueConfig(),
+          exceptions: [{ kind: 'special_hours', date: '2026-12-31', name: 'X', hours: {} }],
+        }),
+      ).toEqual([
+        'exceptions.0.hours: List hours for at least one section (use a closure to close the venue)',
+      ]);
+      // One section with [] is a real change (that section closes), so it is allowed.
+      expect(
+        issues({
+          ...testVenueConfig(),
+          exceptions: [
+            { kind: 'special_hours', date: '2026-12-31', name: 'X', hours: { bar: [] } },
+          ],
+        }),
+      ).toEqual([]);
+      expect(
+        issues({
+          ...testVenueConfig(),
           exceptions: [{ kind: 'closure', date: '2026-12-31', name: 'X', hours: {} }],
         })[0],
       ).toMatch(/Unrecognized key/);

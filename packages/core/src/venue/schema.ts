@@ -109,7 +109,8 @@ const hoursOverride = z.record(slug, sessionList);
  * - `public_holiday`, `event`, `special_hours`: a label for the calendar, plus
  *   optional replacement `hours` per section. A section listed in `hours`
  *   uses those sessions instead of its weekly hours (`[]` closes it); a section
- *   not listed keeps its weekly hours. `special_hours` must list some hours.
+ *   not listed keeps its weekly hours. `special_hours` must list hours for at
+ *   least one section (`hours: {}` is rejected).
  */
 export const dateExceptionSchema = z.discriminatedUnion('kind', [
   z
@@ -141,7 +142,10 @@ export const dateExceptionSchema = z.discriminatedUnion('kind', [
       kind: z.literal('special_hours'),
       date: tradingDate,
       name: label,
-      hours: hoursOverride,
+      hours: hoursOverride.refine(
+        (hours) => Object.keys(hours).length > 0,
+        'List hours for at least one section (use a closure to close the venue)',
+      ),
     })
     .strict(),
 ]);
