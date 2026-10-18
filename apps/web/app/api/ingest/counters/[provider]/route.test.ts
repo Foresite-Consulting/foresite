@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { basicAuth, floorToMinutes, milesightPeriodic } from '@/test/ingest-helpers';
 import { generateDeviceSecret, hashDeviceSecret } from '@/lib/ingest/secrets';
+import type * as RouteModule from './route';
 
 /** Wiring: the route builds its dependencies from the environment. */
 
 const secret = generateDeviceSecret();
-let POST: typeof import('./route').POST;
+let POST: typeof RouteModule.POST;
 const saved = { ...process.env };
 
 beforeAll(async () => {
