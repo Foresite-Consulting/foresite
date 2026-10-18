@@ -30,6 +30,7 @@ describe('@foresite/core public API', () => {
         "daysBetween",
         "exceptionFor",
         "formatUtc",
+        "fromEpochMs",
         "generateSyntheticData",
         "intervalFor",
         "isTradingDay",

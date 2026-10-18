@@ -11,15 +11,33 @@ import { Temporal } from '@js-temporal/polyfill';
 /**
  * Anything accepted as an instant:
  * - a `Date` (must be valid);
- * - a number of milliseconds since the Unix epoch (must be a safe integer);
  * - an ISO 8601 string **with** a `Z` or a numeric UTC offset, e.g.
  *   `2026-10-17T12:00:00Z` or `2026-10-17T20:00:00+08:00`. A string without an
- *   offset is rejected, because a local time on its own is ambiguous.
+ *   offset is rejected, because a local time on its own is ambiguous. A
+ *   bracketed annotation such as `[Australia/Sydney]` is rejected too: the
+ *   offset alone fixes the instant, and an annotation that disagrees with it
+ *   would be silently ignored.
+ *
+ * Numbers are **not** accepted. A bare number cannot say whether it is epoch
+ * seconds or milliseconds, and taking seconds as milliseconds lands in
+ * January 1970 without any error. Convert explicitly with
+ * {@link fromEpochMs} (or `new Date(ms)`).
  *
  * Precision is milliseconds. Finer digits in a string are truncated towards
  * the past.
  */
-export type InstantInput = Date | number | string;
+export type InstantInput = Date | string;
+
+/**
+ * A `Date` from epoch **milliseconds**, the explicit way to pass a number as
+ * an instant. Throws a `RangeError` unless `ms` is a safe integer.
+ */
+export function fromEpochMs(ms: number): Date {
+  if (!Number.isSafeInteger(ms)) {
+    throw new RangeError(`Epoch milliseconds must be a safe integer, got ${ms}`);
+  }
+  return new Date(ms);
+}
 
 /** Parse an {@link InstantInput} into epoch milliseconds, or throw a `RangeError`. */
 export function toEpochMs(input: InstantInput): number {
@@ -29,12 +47,16 @@ export function toEpochMs(input: InstantInput): number {
     return ms;
   }
   if (typeof input === 'number') {
-    if (!Number.isSafeInteger(input)) {
-      throw new RangeError(`Epoch milliseconds must be a safe integer, got ${input}`);
-    }
-    return input;
+    throw new RangeError(
+      `Instant must be a Date or an ISO 8601 string, got the number ${String(input)}. Numbers are ambiguous (seconds or milliseconds?): use fromEpochMs(ms) or new Date(ms).`,
+    );
   }
   if (typeof input === 'string') {
+    if (input.includes('[')) {
+      throw new RangeError(
+        `Invalid instant "${input}": remove the bracketed annotation and keep only the Z or UTC offset, e.g. 2026-10-17T12:00:00Z`,
+      );
+    }
     try {
       return Temporal.Instant.from(input).epochMilliseconds;
     } catch {
@@ -43,7 +65,7 @@ export function toEpochMs(input: InstantInput): number {
       );
     }
   }
-  throw new RangeError('Instant must be a Date, epoch milliseconds or an ISO 8601 string');
+  throw new RangeError('Instant must be a Date or an ISO 8601 string with Z or a UTC offset');
 }
 
 /**

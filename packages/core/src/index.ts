@@ -26,7 +26,7 @@ export {
   type TradingDay,
   type Weekday,
 } from './time/dates';
-export { formatUtc, toEpochMs, type InstantInput } from './time/instant';
+export { formatUtc, fromEpochMs, toEpochMs, type InstantInput } from './time/instant';
 export {
   DEFAULT_CUT_OVER,
   DEFAULT_TIME_ZONE,

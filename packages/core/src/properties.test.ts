@@ -10,6 +10,7 @@ import {
   intervalFor,
   parseVenue,
   sameWeekdayLastYear,
+  fromEpochMs,
   toEpochMs,
   tradingDayBounds,
   tradingDayFor,
@@ -106,7 +107,7 @@ describe('properties', { timeout: 60_000 }, () => {
   it('every instant is in exactly one trading day, and inside its bounds', () => {
     fc.assert(
       fc.property(venueArb, anyInstant, (venue, ms) => {
-        const { tradingDay } = tradingDayFor(ms, venue);
+        const { tradingDay } = tradingDayFor(fromEpochMs(ms), venue);
         const bounds = tradingDayBounds(tradingDay, venue);
         expect(toEpochMs(bounds.startUtc)).toBeLessThanOrEqual(ms);
         expect(ms).toBeLessThan(toEpochMs(bounds.endUtc));
@@ -125,7 +126,7 @@ describe('properties', { timeout: 60_000 }, () => {
   it('bounds are contiguous and 23 to 25 hours long', () => {
     fc.assert(
       fc.property(venueArb, anyInstant, (venue, ms) => {
-        const { tradingDay } = tradingDayFor(ms, venue);
+        const { tradingDay } = tradingDayFor(fromEpochMs(ms), venue);
         const today = tradingDayBounds(tradingDay, venue);
         const tomorrow = tradingDayBounds(addDays(tradingDay, 1), venue);
         expect(today.endUtc).toBe(tomorrow.startUtc);
@@ -139,7 +140,7 @@ describe('properties', { timeout: 60_000 }, () => {
   it('sessions sit inside their trading day, in order, without overlap', () => {
     fc.assert(
       fc.property(venueArb, anyInstant, (venue, ms) => {
-        const { tradingDay } = tradingDayFor(ms, venue);
+        const { tradingDay } = tradingDayFor(fromEpochMs(ms), venue);
         const bounds = tradingDayBounds(tradingDay, venue);
         const start = toEpochMs(bounds.startUtc);
         const end = toEpochMs(bounds.endUtc);
@@ -154,12 +155,14 @@ describe('properties', { timeout: 60_000 }, () => {
             expect(session.durationMinutes).toBeLessThan(24 * 60 + 60);
             previousClose = close;
             // The open is inside, the close is not.
-            expect(tradingDayFor(open, venue, sectionId)).toEqual({
+            expect(tradingDayFor(fromEpochMs(open), venue, sectionId)).toEqual({
               tradingDay,
               sectionId,
               withinScheduledHours: true,
             });
-            expect(tradingDayFor(close - 1, venue, sectionId).withinScheduledHours).toBe(true);
+            expect(
+              tradingDayFor(fromEpochMs(close - 1), venue, sectionId).withinScheduledHours,
+            ).toBe(true);
           }
         }
       }),
@@ -170,10 +173,10 @@ describe('properties', { timeout: 60_000 }, () => {
   it('within-hours for the venue is the OR of its sections', () => {
     fc.assert(
       fc.property(venueArb, anyInstant, (venue, ms) => {
-        const all = tradingDayFor(ms, venue).withinScheduledHours;
+        const all = tradingDayFor(fromEpochMs(ms), venue).withinScheduledHours;
         const any =
-          tradingDayFor(ms, venue, 'a').withinScheduledHours ||
-          tradingDayFor(ms, venue, 'b').withinScheduledHours;
+          tradingDayFor(fromEpochMs(ms), venue, 'a').withinScheduledHours ||
+          tradingDayFor(fromEpochMs(ms), venue, 'b').withinScheduledHours;
         expect(all).toBe(any);
       }),
       RUNS,
@@ -187,7 +190,7 @@ describe('properties', { timeout: 60_000 }, () => {
         anyInstant,
         fc.constantFrom(15 as const, 60 as const),
         (venue, ms, minutes) => {
-          const found = intervalFor(ms, venue, minutes);
+          const found = intervalFor(fromEpochMs(ms), venue, minutes);
           expect(toEpochMs(found.startUtc)).toBeLessThanOrEqual(ms);
           expect(ms).toBeLessThan(toEpochMs(found.endUtc));
           const intervals = tradingDayIntervals(found.tradingDay, venue, minutes);
@@ -224,7 +227,11 @@ describe('properties', { timeout: 60_000 }, () => {
         fc.constantFrom(15 as const, 60 as const),
         (venue, events, minutes) => {
           const buckets = bucketEvents(
-            events.map((e) => ({ at: e.ms, sectionId: e.sectionId, values: { cents: e.cents } })),
+            events.map((e) => ({
+              at: fromEpochMs(e.ms),
+              sectionId: e.sectionId,
+              values: { cents: e.cents },
+            })),
             venue,
             { intervalMinutes: minutes },
           );

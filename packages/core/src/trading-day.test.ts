@@ -5,6 +5,7 @@ import {
   daysBetween,
   exceptionFor,
   formatUtc,
+  fromEpochMs,
   isTradingDay,
   parseTradingDay,
   sameDateLastYear,
@@ -17,10 +18,10 @@ import {
 } from './index';
 
 describe('instants', () => {
-  it('accepts a Date, epoch milliseconds or an ISO string with an offset', () => {
+  it('accepts a Date or an ISO string with an offset', () => {
     const ms = Date.UTC(2026, 9, 17, 12, 0, 0);
     expect(toEpochMs(new Date(ms))).toBe(ms);
-    expect(toEpochMs(ms)).toBe(ms);
+    expect(toEpochMs(fromEpochMs(ms))).toBe(ms);
     expect(toEpochMs('2026-10-17T12:00:00Z')).toBe(ms);
     expect(toEpochMs('2026-10-17T20:00:00+08:00')).toBe(ms);
     expect(toEpochMs('2026-10-17T12:00:00.123456789Z')).toBe(ms + 123);
@@ -28,13 +29,29 @@ describe('instants', () => {
 
   it('rejects anything ambiguous or invalid', () => {
     expect(() => toEpochMs(new Date(Number.NaN))).toThrow('Invalid Date');
-    expect(() => toEpochMs(Number.NaN)).toThrow(RangeError);
-    expect(() => toEpochMs(1.5)).toThrow(RangeError);
-    expect(() => toEpochMs(Number.MAX_SAFE_INTEGER + 2)).toThrow(RangeError);
+    expect(() => toEpochMs('2026-10-17T12:00:00+11:00[Australia/Sydney]')).toThrow(
+      /bracketed annotation/,
+    );
+    expect(() => toEpochMs('2026-10-17T12:00:00Z[u-ca=iso8601]')).toThrow(/bracketed annotation/);
     expect(() => toEpochMs('2026-10-17T12:00:00')).toThrow(/use ISO 8601 with Z/);
     expect(() => toEpochMs('2026-10-17')).toThrow(RangeError);
     expect(() => toEpochMs('not a time')).toThrow(RangeError);
     expect(() => toEpochMs({} as unknown as string)).toThrow(/must be a Date/);
+  });
+
+  it('rejects numbers, so epoch seconds can never pass as milliseconds', () => {
+    const seconds = 1_792_238_400; // 2026-10-17T12:00:00Z in seconds
+    // @ts-expect-error -- numbers are not an InstantInput
+    expect(() => toEpochMs(seconds)).toThrow(/got the number 1792238400.*fromEpochMs/);
+    // @ts-expect-error -- not even at the public API
+    expect(() => tradingDayFor(seconds * 1000, testVenue())).toThrow(/use fromEpochMs/);
+  });
+
+  it('converts epoch milliseconds explicitly with fromEpochMs', () => {
+    expect(fromEpochMs(0).toISOString()).toBe('1970-01-01T00:00:00.000Z');
+    expect(() => fromEpochMs(Number.NaN)).toThrow(/safe integer/);
+    expect(() => fromEpochMs(1.5)).toThrow(/safe integer/);
+    expect(() => fromEpochMs(Number.MAX_SAFE_INTEGER + 2)).toThrow(/safe integer/);
   });
 
   it('formats UTC without needless fractions', () => {
