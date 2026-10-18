@@ -662,6 +662,26 @@
           }
         }
       ]
+    },
+    "sydney0230": {
+      "id": "vector-sydney-0230",
+      "name": "Vector Test Venue (Sydney, 02:30 cut-over)",
+      "timeZone": "Australia/Sydney",
+      "cutOver": "02:30",
+      "sections": [
+        {
+          "id": "bar",
+          "name": "Bar",
+          "hours": {
+            "sat": [
+              {
+                "open": "11:00",
+                "close": "02:00"
+              }
+            ]
+          }
+        }
+      ]
     }
   },
   "tradingDayFor": [
@@ -1181,6 +1201,50 @@
         "withinScheduledHours": false
       },
       "why": "Sun 05:00 LHST starts Sunday's trading day; Saturday's was 24.5 hours long."
+    },
+    {
+      "id": "sydney0230-spring-jump-starts-sunday",
+      "venue": "sydney0230",
+      "instant": "2026-10-03T16:00:00Z",
+      "sectionId": null,
+      "expect": {
+        "tradingDay": "2026-10-04",
+        "withinScheduledHours": false
+      },
+      "why": "The jump instant (03:00 AEDT) is the start of Sunday's trading day, and the bar's 02:00 close (also the jump) is excluded."
+    },
+    {
+      "id": "sydney0230-spring-before-jump",
+      "venue": "sydney0230",
+      "instant": "2026-10-03T15:59:00Z",
+      "sectionId": "bar",
+      "expect": {
+        "tradingDay": "2026-10-03",
+        "withinScheduledHours": true
+      },
+      "why": "01:59 AEST Sun, one minute before the jump: still Saturday's trading day and inside the bar's session."
+    },
+    {
+      "id": "sydney0230-autumn-second-0230",
+      "venue": "sydney0230",
+      "instant": "2026-04-04T16:30:00Z",
+      "sectionId": null,
+      "expect": {
+        "tradingDay": "2026-04-05",
+        "withinScheduledHours": false
+      },
+      "why": "The second 02:30 (AEST) on the night the clocks go back is an hour into Sunday's trading day, which began at the first 02:30."
+    },
+    {
+      "id": "sydney0230-autumn-between",
+      "venue": "sydney0230",
+      "instant": "2026-04-04T15:29:00Z",
+      "sectionId": null,
+      "expect": {
+        "tradingDay": "2026-04-04",
+        "withinScheduledHours": false
+      },
+      "why": "02:29 AEDT, one minute before the first 02:30: still Saturday's trading day; the bar closed at 02:00 AEDT (15:00Z)."
     }
   ],
   "tradingDayBounds": [
@@ -1354,6 +1418,76 @@
         ]
       },
       "why": "Clocks go back: 25-hour trading day. The close takes the first 02:00, keeping 15 elapsed hours."
+    },
+    {
+      "id": "sydney0230-spring-saturday",
+      "venue": "sydney0230",
+      "tradingDay": "2026-10-03",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2026-10-02T16:30:00Z",
+        "endUtc": "2026-10-03T16:00:00Z",
+        "durationMinutes": 1410,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-10-03T01:00:00Z",
+            "closeUtc": "2026-10-03T16:00:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Cut-over 02:30 inside the skipped hour. Starts Sat 02:30 AEST (16:30Z Fri). Sun 4 Oct 02:30 does not exist (02:00 AEST jumps to 03:00 AEDT at 16:00Z), so the day ends at the jump: 23.5 h. The 02:00 close is also skipped and maps to the same jump, so the bar keeps its 15 h."
+    },
+    {
+      "id": "sydney0230-spring-sunday",
+      "venue": "sydney0230",
+      "tradingDay": "2026-10-04",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2026-10-03T16:00:00Z",
+        "endUtc": "2026-10-04T15:30:00Z",
+        "durationMinutes": 1410,
+        "sessions": []
+      },
+      "why": "Starts at the jump (03:00 AEDT, 16:00Z), the first instant after the gap, so it touches Saturday's end. Ends Mon 02:30 AEDT (15:30Z): 23.5 h. Two 23.5 h days, not 23 + 24, because the cut-over sits in the gap."
+    },
+    {
+      "id": "sydney0230-autumn-saturday",
+      "venue": "sydney0230",
+      "tradingDay": "2026-04-04",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2026-04-03T15:30:00Z",
+        "endUtc": "2026-04-04T15:30:00Z",
+        "durationMinutes": 1440,
+        "sessions": [
+          {
+            "sectionId": "bar",
+            "open": "11:00",
+            "close": "02:00",
+            "openUtc": "2026-04-04T00:00:00Z",
+            "closeUtc": "2026-04-04T15:00:00Z",
+            "durationMinutes": 900
+          }
+        ]
+      },
+      "why": "Cut-over 02:30 inside the repeated hour. Sun 5 Apr 02:30 happens twice (AEDT, then AEST after 03:00 AEDT goes back to 02:00 at 16:00Z); the first occurrence is 02:30 AEDT (15:30Z). Starts Sat 02:30 AEDT (15:30Z Fri): 24 h. The 02:00 close is also repeated and takes its first occurrence (15:00Z): 15 h."
+    },
+    {
+      "id": "sydney0230-autumn-sunday",
+      "venue": "sydney0230",
+      "tradingDay": "2026-04-05",
+      "sectionId": null,
+      "expect": {
+        "startUtc": "2026-04-04T15:30:00Z",
+        "endUtc": "2026-04-05T16:30:00Z",
+        "durationMinutes": 1500,
+        "sessions": []
+      },
+      "why": "Starts at the first 02:30 (AEDT, 15:30Z), so the second 02:30 (AEST, 16:30Z Sat) belongs to Sunday. Ends Mon 02:30 AEST (16:30Z): 25 h."
     },
     {
       "id": "sydney-normal-summer",

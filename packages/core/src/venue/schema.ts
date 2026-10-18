@@ -71,7 +71,9 @@ const tradingDate = z
  * One trading session: `open` to `close`, local wall-clock `HH:MM`.
  *
  * A close at or before the open is on the next calendar date (`11:00`–`02:00`
- * closes at 2 am the next morning). Both times must fall inside the same
+ * closes at 2 am the next morning). An open earlier than the cut-over is
+ * also on the next calendar date (with a 05:00 cut-over, `01:00`–`04:00` is
+ * the early hours after the trading day's date). Both times must fall inside the same
  * trading day: the session may not cross the venue's cut-over.
  * The session includes its open and excludes its close: `[open, close)`.
  */

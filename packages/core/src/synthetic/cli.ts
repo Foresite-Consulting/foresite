@@ -8,11 +8,13 @@
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ZodError } from 'zod';
+import { addDays } from '../time/dates';
 import { DatasetConflictError, writeDataset } from './write';
 import {
   DEFAULT_SYNTHETIC_SEED,
   DEFAULT_SYNTHETIC_START_DAY,
   generateSyntheticData,
+  type ResolvedSyntheticOptions,
 } from './generate';
 
 export const USAGE = `Usage: npm run synth -w packages/core -- --days <n> --out <dir> [options]
@@ -44,6 +46,21 @@ function integer(value: string | undefined, name: string): number | undefined {
   if (!/^\d+$/.test(value))
     throw new RangeError(`--${name} must be a whole number, got "${value}"`);
   return Number(value);
+}
+
+/**
+ * A warning when the run goes past the last public holiday in the list (the
+ * sample list ends in Dec 2026), because later holidays would then trade as
+ * ordinary days. `null` when the list covers the run.
+ */
+export function holidayCoverageWarning(options: ResolvedSyntheticOptions): string | null {
+  const lastDay = addDays(options.startDay, options.days - 1);
+  const lastHoliday = options.publicHolidays.reduce<string | null>(
+    (latest, holiday) => (latest === null || holiday.date > latest ? holiday.date : latest),
+    null,
+  );
+  if (lastHoliday !== null && lastDay <= lastHoliday) return null;
+  return `Warning: the run ends on ${lastDay}, after the last listed public holiday (${lastHoliday ?? 'none listed'}). Public holidays after that date are generated as ordinary days.`;
 }
 
 /** Run the CLI. Returns the process exit code. */
@@ -88,6 +105,8 @@ export function runSynthCli(argv: readonly string[], io: CliIo): number {
         lateDuplicate: all || values['late-duplicate'],
       },
     });
+    const warning = holidayCoverageWarning(dataset.options);
+    if (warning !== null) io.error(warning);
     const outDir = resolve(io.cwd, values.out);
     const written = writeDataset(dataset, outDir, { force: values.force });
     io.log(

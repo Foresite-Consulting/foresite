@@ -6,7 +6,7 @@ import fc from 'fast-check';
 import { afterAll, describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import { daysBetween, tradingDayIntervals, weekdayOf } from '../index';
-import { runSynthCli, USAGE } from './cli';
+import { holidayCoverageWarning, runSynthCli, USAGE } from './cli';
 import { datasetFiles, toCsv } from './csv';
 import { generateSyntheticData, MODELS, SYNTHETIC_NOTICE, type SyntheticDataset } from './generate';
 import { SAMPLE_WA_PUBLIC_HOLIDAYS } from './holidays';
@@ -470,6 +470,27 @@ describe('synth CLI', { timeout: 30_000 }, () => {
     const { io, err } = silentIo();
     expect(runSynthCli(['--days', '1', '--out', dir], io)).toBe(2);
     expect(err.join('\n')).toMatch(/unreadable manifest\.json/);
+  });
+
+  it('warns on stderr when the run goes past the last listed public holiday', () => {
+    const late = silentIo();
+    expect(
+      runSynthCli(['--days', '2', '--start', '2026-12-28', '--out', 'late-holidays'], late.io),
+    ).toBe(0);
+    expect(late.err).toEqual([
+      'Warning: the run ends on 2026-12-29, after the last listed public holiday (2026-12-28). Public holidays after that date are generated as ordinary days.',
+    ]);
+    const covered = silentIo();
+    expect(
+      runSynthCli(
+        ['--days', '1', '--start', '2026-12-28', '--out', 'covered-holidays'],
+        covered.io,
+      ),
+    ).toBe(0);
+    expect(covered.err).toEqual([]);
+    expect(
+      holidayCoverageWarning(generateSyntheticData({ days: 1, publicHolidays: [] }).options),
+    ).toMatch(/\(none listed\)/);
   });
 
   it('prints help', () => {

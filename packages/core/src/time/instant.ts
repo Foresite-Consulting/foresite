@@ -84,14 +84,6 @@ export function zoned(epochMs: number, timeZone: string): Temporal.ZonedDateTime
 }
 
 /**
- * Local wall-clock time with its UTC offset, minute precision, e.g.
- * `2026-04-05T02:30+10:00`. The offset makes the repeated hour unambiguous.
- */
-export function formatLocal(epochMs: number, timeZone: string): string {
-  return zoned(epochMs, timeZone).toString({ timeZoneName: 'never', smallestUnit: 'minute' });
-}
-
-/**
  * Turn a local wall-clock time into an instant, the same way every time:
  *
  * - **Normal time** (exists exactly once): that instant.

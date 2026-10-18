@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testVenue } from './test-support';
+import { INTERVAL_CACHE_LIMIT } from './buckets';
+import { CACHE_LIMIT, memo } from './trading-day';
 import {
   bucketEvents,
   intervalFor,
@@ -212,5 +214,17 @@ describe('bucketEvents', () => {
 
   it('returns nothing for no events', () => {
     expect(bucketEvents([], perth, { intervalMinutes: 60 })).toEqual([]);
+  });
+});
+
+describe('caches', () => {
+  it('bounds memo maps, with a smaller limit for interval lists', () => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < 5; i += 1) memo(map, `k${i}`, () => i, 3);
+    // Cleared when full, then the new entry added.
+    expect([...map.keys()]).toEqual(['k3', 'k4']);
+    expect(memo(map, 'k4', () => -1, 3)).toBe(4);
+    expect(INTERVAL_CACHE_LIMIT).toBe(2_000);
+    expect(INTERVAL_CACHE_LIMIT).toBeLessThan(CACHE_LIMIT);
   });
 });

@@ -20,6 +20,11 @@ Plain-language notes first, then the technical detail. Dates as `18 Oct 2026`.
   - Data dictionary: GST is rounded per row; aggregate GST is the sum of row `gst_cents`, never recomputed from aggregate net.
   - `toCsv` guards against formula injection: text cells starting with `=`, `+`, `-`, `@`, tab or CR get a leading `'`. The committed fixture is unchanged byte for byte.
   - `npm run synth` refuses to overwrite a folder holding a different dataset (by `manifest.json`) unless `--force`.
+  - Synth CLI warns on stderr when a run goes past the last listed sample public holiday.
+  - Interval-list cache limited to 2,000 entries per venue (other memo maps stay at 20,000).
+  - Removed the unused `formatLocal`; interval labels have one implementation (`buckets.ts`).
+  - Golden vectors for a Sydney 02:30 cut-over on both change nights (1410 + 1410 minutes in spring, 1440 + 1500 in autumn), cross-checked with Python `zoneinfo`.
+  - Data dictionary: an open before the cut-over is on the next calendar date; day lengths with a cut-over in the change band.
   - Instants: `InstantInput` is now `Date | string`; numbers are rejected by the type and at runtime (epoch seconds could pass as milliseconds). New `fromEpochMs(ms)` for explicit conversion. ISO strings with a bracketed annotation (`[...]`) are rejected.
 - Coverage gate: `npm run coverage` (part of `npm run check` and CI) with 95% thresholds for `packages/core`, using `@vitest/coverage-v8` 4.1.11.
 

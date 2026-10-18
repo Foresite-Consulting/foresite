@@ -109,14 +109,24 @@ function buildIntervals(
   return intervals;
 }
 
+/**
+ * Interval lists per venue to keep. Each is up to 100 objects (a day of
+ * 15-minute intervals), so this map gets a smaller limit than the others:
+ * 2,000 lists is about 2.7 years of days at both lengths.
+ */
+export const INTERVAL_CACHE_LIMIT = 2_000;
+
 function msIntervals(
   venue: Venue,
   day: TradingDay,
   intervalMinutes: IntervalMinutes,
 ): readonly MsInterval[] {
   const cache = cacheFor(venue).extra as Map<string, readonly MsInterval[]>;
-  return memo(cache, `intervals|${day}|${intervalMinutes}`, () =>
-    buildIntervals(venue, day, intervalMinutes),
+  return memo(
+    cache,
+    `intervals|${day}|${intervalMinutes}`,
+    () => buildIntervals(venue, day, intervalMinutes),
+    INTERVAL_CACHE_LIMIT,
   );
 }
 

@@ -9,7 +9,10 @@
  *    to the cut-over on local date D+1: a half-open window `[start, end)`.
  *    Every instant belongs to exactly one trading day, and the end of D is
  *    the start of D+1. The window is 24 hours long, or 23 / 25 hours (23.5 /
- *    24.5 on Lord Howe Island) on a night the clocks change.
+ *    24.5 on Lord Howe Island) on a night the clocks change. A cut-over set
+ *    inside the change band splits the change differently: in Sydney a 02:30
+ *    cut-over gives 23.5 h + 23.5 h on the spring night and 24 h + 25 h on
+ *    the autumn night (see the `sydney0230-*` golden vectors).
  * 3. **Sessions** (scheduled hours) sit inside their trading day's window:
  *    validation rejects any session that crosses the cut-over. So "the
  *    session's trading day" and "the trading day by cut-over" are always the
@@ -59,7 +62,7 @@ export interface TradingDayBounds {
   readonly startUtc: string;
   /** End of the trading day (the next cut-over), ISO 8601 UTC, exclusive. */
   readonly endUtc: string;
-  /** Elapsed minutes: 1440 normally, 1380 or 1500 when the clocks change. */
+  /** Elapsed minutes: 1440 normally; 1380 to 1500 when the clocks change (see rule 2). */
   readonly durationMinutes: number;
   /** The date exception that applies, if any. */
   readonly exception: DateException | null;
@@ -87,7 +90,8 @@ export interface PlacedSession {
   readonly closeMs: number;
 }
 
-const CACHE_LIMIT = 20_000;
+/** Entries per memo map before it is cleared (small results: day starts, sessions). */
+export const CACHE_LIMIT = 20_000;
 
 interface VenueCache {
   readonly cutOverMinutes: number;
@@ -118,11 +122,16 @@ export function cacheFor(venue: Venue): VenueCache {
 }
 
 /** Internal: memoise into a bounded map (cleared when full, which is rare and cheap). */
-export function memo<T>(map: Map<string, T>, key: string, compute: () => T): T {
+export function memo<T>(
+  map: Map<string, T>,
+  key: string,
+  compute: () => T,
+  limit: number = CACHE_LIMIT,
+): T {
   const hit = map.get(key);
   if (hit !== undefined) return hit;
   const value = compute();
-  if (map.size >= CACHE_LIMIT) map.clear();
+  if (map.size >= limit) map.clear();
   map.set(key, value);
   return value;
 }
