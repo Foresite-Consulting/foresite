@@ -17,3 +17,8 @@ Plain-language notes first, then the technical detail. Dates as `18 Oct 2026`.
 - `apps/web`: Next.js 15 App Router, IBM Plex Sans/Mono via `next/font`, manifest and icons from the theme, service worker, offline page, nonce-based Content-Security-Policy and the other security headers, `GET /api/health`, Playwright smoke tests (phone light, desktop dark) with an axe scan.
 - `forecast/`: Python 3.12 placeholder with ruff, mypy strict, pytest and a `uv.lock`.
 - CI on GitHub Actions: node, Playwright, Python, gitleaks over the full history (pinned binary with checksum), `npm audit` and `pip-audit`. Actions pinned to commit SHAs. Dependabot for npm, uv and actions. PR template with the QA and security gates.
+
+### Fixed (scaffold review)
+
+- Keyboard focus is now visible everywhere: a 2px outline in the theme's `link` colour. `theme:check` requires `link` to reach 3:1 on `bg` and `surface` for the focus indicator. (#1)
+- `formatAud` and `formatPercent` round halves away from zero correctly (`1.005` → `$1.01`, `-2.675` → `-$2.68`); new `formatAudCents` formats integer cents exactly. Money should flow as integer cents. Added `ES2023.Intl` to the TypeScript libs for `signDisplay: 'negative'` and decimal-string formatting. (#2)

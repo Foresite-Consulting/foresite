@@ -25,26 +25,61 @@ function assertFinite(value: number, name: string): void {
     throw new RangeError(`${name} must be a finite number, got ${value}`);
 }
 
+function audFormatter(cents: boolean): Intl.NumberFormat {
+  return new Intl.NumberFormat(LOCALE, {
+    style: 'currency',
+    currency: 'AUD',
+    currencyDisplay: 'narrowSymbol',
+    minimumFractionDigits: cents ? 2 : 0,
+    maximumFractionDigits: cents ? 2 : 0,
+    // Intl rounds half away from zero (halfExpand) on the number's shortest
+    // decimal form, so 1.005 → $1.01 and -2.675 → -$2.68. 'negative' drops the
+    // sign when the rounded amount is zero, so -0.001 is "$0.00", never "-$0.00".
+    signDisplay: 'negative',
+  });
+}
+
+function withGst(amount: string, options: { gst: GstBasis; label?: boolean }): string {
+  return (options.label ?? true) ? `${amount} ${gstLabel(options.gst)}` : amount;
+}
+
 /**
- * Format an amount in Australian dollars.
+ * Format an amount in Australian dollars, for display.
+ *
+ * Money should flow through the app as **integer cents** (the data layer stores
+ * it that way) and be shown with `formatAudCents`. Use `formatAud` for amounts
+ * that are already dollars, such as a rounded forecast or a budget figure. It
+ * rounds half away from zero; it is a display helper, not arithmetic.
  *
  * `formatAud(1234.5, { gst: 'ex' })` → `$1,234.50 ex GST`
  * `formatAud(-80, { gst: 'inc', cents: false })` → `-$80 inc GST`
  */
 export function formatAud(value: number, options: AudOptions): string {
   assertFinite(value, 'value');
-  const cents = options.cents ?? true;
-  const formatter = new Intl.NumberFormat(LOCALE, {
-    style: 'currency',
-    currency: 'AUD',
-    currencyDisplay: 'narrowSymbol',
-    minimumFractionDigits: cents ? 2 : 0,
-    maximumFractionDigits: cents ? 2 : 0,
-  });
-  // Avoid "-$0" when a tiny negative rounds to zero.
-  const rounded = cents ? Math.round(value * 100) / 100 : Math.round(value);
-  const amount = formatter.format(rounded === 0 ? 0 : rounded);
-  return (options.label ?? true) ? `${amount} ${gstLabel(options.gst)}` : amount;
+  // No pre-rounding here: Math.round(value * 100) / 100 mis-rounds half cents
+  // (1.005 * 100 is 100.49999…). Intl rounds the decimal value correctly.
+  return withGst(audFormatter(options.cents ?? true).format(value), options);
+}
+
+/**
+ * Format an integer number of cents exactly: `formatAudCents(123450, { gst: 'ex' })`
+ * → `$1,234.50 ex GST`. Throws `RangeError` for anything that is not a safe
+ * integer, so a float that should have been rounded upstream is caught.
+ * With `cents: false` the amount is rounded to whole dollars, half away from zero.
+ */
+export function formatAudCents(cents: number, options: AudOptions): string {
+  if (!Number.isSafeInteger(cents)) {
+    throw new RangeError(`cents must be a safe integer, got ${cents}`);
+  }
+  const showCents = options.cents ?? true;
+  // Build the exact decimal string (no float division), then let Intl format
+  // it. Intl accepts decimal strings (ES2023 Intl.NumberFormat v3, in Node 22
+  // and every supported browser), so large amounts never lose a cent.
+  const abs = Math.abs(cents);
+  const sign = cents < 0 ? '-' : '';
+  const decimal =
+    `${sign}${Math.trunc(abs / 100)}.${String(abs % 100).padStart(2, '0')}` as `${number}`;
+  return withGst(audFormatter(showCents).format(decimal), options);
 }
 
 export function gstLabel(gst: GstBasis): string {
@@ -68,11 +103,12 @@ export function formatPercent(fraction: number, options: PercentOptions = {}): s
     style: 'percent',
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-    signDisplay: options.signed ? 'exceptZero' : 'auto',
+    // Intl rounds half away from zero on the decimal value (no pre-rounding,
+    // which mis-rounds halves). 'exceptZero' and 'negative' both drop the sign
+    // when the rounded value is zero, so there is never a "-0.0%".
+    signDisplay: options.signed ? 'exceptZero' : 'negative',
   });
-  const factor = 10 ** (decimals + 2);
-  const rounded = Math.round(fraction * factor) / factor;
-  return formatter.format(rounded === 0 ? 0 : rounded);
+  return formatter.format(fraction);
 }
 
 /** Format a whole-number count with thousands separators: 12345 → `12,345`. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatAud,
+  formatAudCents,
   formatCount,
   formatDate,
   formatDateTime,
@@ -40,14 +41,71 @@ describe('formatAud', () => {
     expect(formatAud(1e9, { gst: 'ex', cents: false })).toBe('$1,000,000,000 ex GST');
   });
 
-  it('rounds half cents the way a till does', () => {
-    expect(formatAud(0.005, { gst: 'ex', label: false })).toBe('$0.01');
-    expect(formatAud(2.675, { gst: 'ex', label: false })).toBe('$2.68');
+  it('rounds half cents away from zero, including values that are not exact in binary', () => {
+    const aud = (v: number) => formatAud(v, { gst: 'ex', label: false });
+    expect(aud(0.005)).toBe('$0.01');
+    expect(aud(2.675)).toBe('$2.68');
+    expect(aud(1.005)).toBe('$1.01');
+    expect(aud(1.255)).toBe('$1.26');
+    expect(aud(8.325)).toBe('$8.33');
+    expect(aud(-2.675)).toBe('-$2.68');
+    expect(aud(-0.005)).toBe('-$0.01');
+    expect(aud(-0.001)).toBe('$0.00');
+  });
+
+  it('rounds half dollars away from zero without cents', () => {
+    const aud = (v: number) => formatAud(v, { gst: 'ex', cents: false, label: false });
+    expect(aud(80.5)).toBe('$81');
+    expect(aud(-80.5)).toBe('-$81');
+    expect(aud(-0.4)).toBe('$0');
+    expect(aud(-0.5)).toBe('-$1');
   });
 
   it('rejects NaN and infinity', () => {
     expect(() => formatAud(Number.NaN, { gst: 'ex' })).toThrow(RangeError);
     expect(() => formatAud(Number.POSITIVE_INFINITY, { gst: 'ex' })).toThrow(RangeError);
+  });
+});
+
+describe('formatAudCents', () => {
+  it('formats integer cents exactly', () => {
+    expect(formatAudCents(123450, { gst: 'ex' })).toBe('$1,234.50 ex GST');
+    expect(formatAudCents(1, { gst: 'inc', label: false })).toBe('$0.01');
+    expect(formatAudCents(0, { gst: 'inc' })).toBe('$0.00 inc GST');
+    expect(formatAudCents(-8000, { gst: 'inc' })).toBe('-$80.00 inc GST');
+    expect(formatAudCents(-1, { gst: 'ex', label: false })).toBe('-$0.01');
+  });
+
+  it('stays exact for large values, up to the largest safe integer', () => {
+    expect(formatAudCents(123_456_789_012_345, { gst: 'ex', label: false })).toBe(
+      '$1,234,567,890,123.45',
+    );
+    expect(formatAudCents(Number.MAX_SAFE_INTEGER, { gst: 'ex', label: false })).toBe(
+      '$90,071,992,547,409.91',
+    );
+    expect(formatAudCents(-Number.MAX_SAFE_INTEGER, { gst: 'ex', label: false })).toBe(
+      '-$90,071,992,547,409.91',
+    );
+  });
+
+  it('rounds to whole dollars, half away from zero, when cents are dropped', () => {
+    const aud = (c: number) => formatAudCents(c, { gst: 'ex', cents: false, label: false });
+    expect(aud(1_248_040)).toBe('$12,480');
+    expect(aud(8050)).toBe('$81');
+    expect(aud(-8050)).toBe('-$81');
+    expect(aud(-40)).toBe('$0');
+  });
+
+  it('rejects anything that is not a safe integer', () => {
+    for (const bad of [
+      1.5,
+      0.1,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.MAX_SAFE_INTEGER + 1,
+    ]) {
+      expect(() => formatAudCents(bad, { gst: 'ex' }), String(bad)).toThrow(RangeError);
+    }
   });
 });
 
@@ -68,6 +126,21 @@ describe('formatPercent', () => {
     expect(formatPercent(-0.042, { signed: true })).toBe('-4.2%');
     expect(formatPercent(0, { signed: true })).toBe('0.0%');
     expect(formatPercent(-0.0001, { signed: true })).toBe('0.0%');
+  });
+
+  it('rounds halves away from zero without pre-rounding', () => {
+    expect(formatPercent(0.0425)).toBe('4.3%');
+    expect(formatPercent(-0.0425)).toBe('-4.3%');
+    expect(formatPercent(0.01005, { decimals: 2 })).toBe('1.01%');
+    expect(formatPercent(-0.01005, { decimals: 2 })).toBe('-1.01%');
+    expect(formatPercent(0.0425, { signed: true })).toBe('+4.3%');
+    expect(formatPercent(-0.0425, { signed: true })).toBe('-4.3%');
+  });
+
+  it('never shows a negative zero', () => {
+    expect(formatPercent(-0.0001)).toBe('0.0%');
+    expect(formatPercent(-0)).toBe('0.0%');
+    expect(formatPercent(-0.004, { decimals: 0 })).toBe('0%');
   });
 
   it('handles negatives and large values', () => {
