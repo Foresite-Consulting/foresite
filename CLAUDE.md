@@ -41,7 +41,8 @@ Foresite is a services brand. Every client app looks like the **client's** app.
 4. Chart semantics never change per client: actuals solid, comparisons muted, forecasts dotted, forecast range shaded. Only the colours come from the theme.
 
 ## Rules for every change
-- No secrets in code or commits. `.env.example` lists every variable, with a comment on each. Real values live in the client's Vercel/Supabase accounts.
+- No secrets in code or commits. `.env.example` lists every variable, with a comment on each. Real values live in the client's Vercel/Supabase accounts. Anything in client-side code is public: only `NEXT_PUBLIC_*` values the security review has agreed may reach the browser.
+- Every database query is parameterised and every API input is validated on the server. Every retry has a limit; nothing calls itself; paid calls have a daily ceiling in code.
 - All client accounts (GitHub, Vercel, Supabase, Twilio, vendor APIs) are in the **client's** name. Never create an account, request an API key or contact a vendor without Connor's approval.
 - Client data never leaves that client's systems. No real client data in this repo, in fixtures or in tests. Use synthetic data.
 - Every claim about a vendor API is checked against its documentation and linked, or marked `UNVERIFIED`.
@@ -66,6 +67,7 @@ Foresite is a services brand. Every client app looks like the **client's** app.
 - `new-client`: start a client build from this template.
 - `add-connector`: add a vendor connector the standard way.
 - `release-handover`: milestone release and final handover checklist.
+- `security-audit`: whole-build audit before every release and before anything goes on a public URL (secrets in the browser bundle, data access, hostile input, runaway cost, accessibility). Uses `scripts/scan-client-bundle.sh`.
 
 ## How a job runs
 1. Build & Data writes the Technical Build Spec in the Foresite Project. It is the source of truth for scope.
